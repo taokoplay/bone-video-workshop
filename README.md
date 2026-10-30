@@ -7,7 +7,7 @@ An independent PI-Desktop plugin for Agent-driven visual productions
 
 - Plugin ID: `bone.video.workshop`
 - Version: `0.21.0`
-- License: AGPL-3.0-only. This plugin stays separate from PI-Desktop's
+- License: [AGPL-3.0-only](LICENSE). This plugin stays separate from PI-Desktop's
   LGPL-3.0 repository and does not read DutyDeck production data.
 - Canonical source: `/Users/xutaoyu/CodeSource/PI-Plugins/bone-video-workshop`.
   The former `CodeSource/BoneVideoWorkshop` location remains a compatibility
@@ -316,6 +316,9 @@ are additive. Older no-plan snapshots and legacy `mediaId` remain readable;
 workflow status reports missing planning steps without rewriting old works.
 
 ## Permissions and installation
+
+See the [installation, upgrade and backup guide](docs/installation-upgrade.md)
+for release downloads, development loading and data-preserving updates.
 
 | Permission | Purpose |
 |---|---|
