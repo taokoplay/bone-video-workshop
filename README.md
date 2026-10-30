@@ -1,5 +1,7 @@
 # bone-video-workshop — Bone 影视工厂
 
+English | [简体中文](README.zh-CN.md)
+
 An independent PI-Desktop plugin for Agent-driven visual productions
 (comic / film / promo / image), with a read-only production workbench.
 
@@ -318,7 +320,7 @@ workflow status reports missing planning steps without rewriting old works.
 | Permission | Purpose |
 |---|---|
 | `ui.view` | Show the workbench |
-| `agent.tool.register` | Register 20 production tools |
+| `agent.tool.register` | Register 24 production tools |
 | `agent.prompt.inject` | Discover and load the production skill on demand |
 | `fs.read` | Import workspace sources scoped to `bone-media/**` |
 | `clipboard.write` | Copy IDs and scoped Agent instructions |
