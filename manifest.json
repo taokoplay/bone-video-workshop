@@ -1,0 +1,2053 @@
+{
+  "schemaVersion": 1,
+  "id": "bone.video.workshop",
+  "name": "Bone 影视工厂",
+  "version": "0.21.0",
+  "description": "Create and browse visual productions (works, scripts, shots) with the Agent inside PI-Desktop.",
+  "main": "main.js",
+  "contributes": {
+    "skills": [
+      "skills/film-production/SKILL.md"
+    ],
+    "views": [
+      {
+        "id": "workshop",
+        "title": {
+          "en": "Bone Film Factory",
+          "zh-CN": "Bone 影视工厂"
+        },
+        "icon": "image",
+        "entry": "views/workshop.html",
+        "order": 10
+      }
+    ],
+    "commands": [
+      {
+        "id": "bone.video.workshop.open",
+        "title": "Bone 影视工厂: 打开工作台",
+        "keywords": [
+          "bone",
+          "video",
+          "影视",
+          "workshop"
+        ]
+      }
+    ],
+    "agentTools": [
+      {
+        "name": "register_media",
+        "description": "Import a workspace media file through host permissions into private storage. Registers only; call adopt_media to bind it. Shot imports require the current shot revision.",
+        "risk": "medium",
+        "schema": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "path": {
+              "type": "string"
+            },
+            "kind": {
+              "type": "string",
+              "enum": [
+                "image",
+                "video",
+                "audio"
+              ]
+            },
+            "title": {
+              "type": "string",
+              "maxLength": 300
+            },
+            "shotId": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "description": "不适用的目标请省略或传 null，不能用空字符串占位"
+            },
+            "expectedShotRevision": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "minimum": 1,
+              "description": "镜头目标必须填当前修订号；资产目标省略或 null"
+            }
+          },
+          "required": [
+            "id",
+            "path",
+            "kind"
+          ],
+          "additionalProperties": false
+        }
+      },
+      {
+        "name": "adopt_media",
+        "description": "Explicitly bind registered media to exactly one asset or shot. Shot adoption requires the current shot revision; locked assets must be unlocked before rebinding.",
+        "risk": "medium",
+        "schema": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "mediaId": {
+              "type": "string"
+            },
+            "assetId": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "description": "不适用的目标请省略或传 null，不能用空字符串占位"
+            },
+            "shotId": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "description": "不适用的目标请省略或传 null，不能用空字符串占位"
+            },
+            "expectedShotRevision": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "minimum": 1,
+              "description": "镜头目标必须填当前修订号；资产目标省略或 null"
+            }
+          },
+          "required": [
+            "id",
+            "mediaId"
+          ],
+          "additionalProperties": false
+        }
+      },
+      {
+        "name": "record_media_inspection",
+        "description": "记录 Agent 报告的视频或音频时长、方法与可用范围。须匹配登记字节；不代表宿主解码认证或观看证明，浏览器预览仍需独立解码核对。",
+        "risk": "medium",
+        "schema": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$",
+              "description": "作品 ID"
+            },
+            "expectedProductionRevision": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991,
+              "description": "读取到的当前作品版本；在写入队列内检查"
+            },
+            "mediaId": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$",
+              "description": "已登记视频或音频 ID"
+            },
+            "sha256": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$",
+              "description": "必须匹配登记素材的 SHA-256"
+            },
+            "durationSeconds": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 86400,
+              "description": "Agent 报告的源时长；不代表宿主解码认证",
+              "exclusiveMinimum": 0
+            },
+            "method": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 500,
+              "description": "Agent 使用的测量或观察方法"
+            },
+            "findings": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 8000,
+              "description": "观察结果与限制"
+            },
+            "usableRanges": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "inSeconds": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 86400,
+                    "description": "源素材入点（秒）"
+                  },
+                  "outSeconds": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 86400,
+                    "description": "源素材出点（秒），必须大于入点"
+                  },
+                  "note": {
+                    "type": "string",
+                    "minLength": 0,
+                    "maxLength": 8000,
+                    "description": "范围说明"
+                  }
+                },
+                "required": [
+                  "inSeconds",
+                  "outSeconds",
+                  "note"
+                ],
+                "additionalProperties": false
+              },
+              "minItems": 0,
+              "maxItems": 200,
+              "description": "可用源范围；不等于作品剪辑预算"
+            }
+          },
+          "required": [
+            "id",
+            "expectedProductionRevision",
+            "mediaId",
+            "sha256",
+            "durationSeconds",
+            "method",
+            "findings",
+            "usableRanges"
+          ],
+          "additionalProperties": false
+        }
+      },
+      {
+        "name": "save_edit_plan",
+        "description": "整体保存本集视频选段与独立音轨，校验源时长、镜头归属、变速策略和双版本锁。仅硬切预览；不修改源文件、不采用输出、不导出成片。",
+        "risk": "medium",
+        "schema": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$",
+              "description": "作品 ID"
+            },
+            "expectedProductionRevision": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991,
+              "description": "读取到的当前作品版本；在写入队列内检查"
+            },
+            "episodeId": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$",
+              "description": "剧集 ID"
+            },
+            "expectedEditRevision": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991,
+              "description": "当前剪辑版本；首次保存填 0"
+            },
+            "clips": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "clipId": {
+                    "type": "string",
+                    "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$",
+                    "description": "方案内稳定且唯一的片段标识"
+                  },
+                  "shotId": {
+                    "type": "string",
+                    "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$",
+                    "description": "本集真实镜头 ID"
+                  },
+                  "mediaId": {
+                    "type": "string",
+                    "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$",
+                    "description": "已登记视频 ID"
+                  },
+                  "inSeconds": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 86400,
+                    "description": "源素材入点（秒）"
+                  },
+                  "outSeconds": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 86400,
+                    "description": "源素材出点（秒），必须大于入点"
+                  },
+                  "speed": {
+                    "type": "number",
+                    "minimum": 0.25,
+                    "maximum": 4,
+                    "description": "恒定播放速度；变速须符合镜头策略"
+                  },
+                  "includeSourceAudio": {
+                    "type": "boolean",
+                    "description": "是否播放该视频的源声音"
+                  },
+                  "note": {
+                    "type": "string",
+                    "minLength": 0,
+                    "maxLength": 8000,
+                    "description": "选段说明"
+                  }
+                },
+                "required": [
+                  "clipId",
+                  "shotId",
+                  "mediaId",
+                  "inSeconds",
+                  "outSeconds",
+                  "speed",
+                  "includeSourceAudio",
+                  "note"
+                ],
+                "additionalProperties": false
+              },
+              "minItems": 1,
+              "maxItems": 200,
+              "description": "按时间线顺序排列的视频片段；仅支持硬切预览"
+            },
+            "audioTracks": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "trackId": {
+                    "type": "string",
+                    "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$",
+                    "description": "方案内稳定且唯一的音轨标识"
+                  },
+                  "mediaId": {
+                    "type": "string",
+                    "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$",
+                    "description": "已登记音频 ID"
+                  },
+                  "role": {
+                    "type": "string",
+                    "enum": [
+                      "dialogue",
+                      "ambience",
+                      "effects",
+                      "music"
+                    ],
+                    "description": "声音用途"
+                  },
+                  "startSeconds": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 69120000,
+                    "description": "剪辑时间线起点（秒）"
+                  },
+                  "inSeconds": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 86400,
+                    "description": "源素材入点（秒）"
+                  },
+                  "outSeconds": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 86400,
+                    "description": "源素材出点（秒），必须大于入点"
+                  },
+                  "gain": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1,
+                    "description": "音量倍数，浏览器预览支持0..1"
+                  },
+                  "note": {
+                    "type": "string",
+                    "minLength": 0,
+                    "maxLength": 8000,
+                    "description": "音轨说明"
+                  }
+                },
+                "required": [
+                  "trackId",
+                  "mediaId",
+                  "role",
+                  "startSeconds",
+                  "inSeconds",
+                  "outSeconds",
+                  "gain",
+                  "note"
+                ],
+                "additionalProperties": false
+              },
+              "minItems": 0,
+              "maxItems": 32,
+              "description": "独立音轨，可明确重叠；不增加剪辑总长"
+            },
+            "cutNotes": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "fromClipId": {
+                    "type": "string",
+                    "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$",
+                    "description": "前一个片段 ID"
+                  },
+                  "toClipId": {
+                    "type": "string",
+                    "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$",
+                    "description": "紧接的后一个片段 ID"
+                  },
+                  "visual": {
+                    "type": "string",
+                    "minLength": 0,
+                    "maxLength": 8000,
+                    "description": "画面衔接计划，仅作说明"
+                  },
+                  "audio": {
+                    "type": "string",
+                    "minLength": 0,
+                    "maxLength": 8000,
+                    "description": "声音衔接计划，仅作说明"
+                  }
+                },
+                "required": [
+                  "fromClipId",
+                  "toClipId",
+                  "visual",
+                  "audio"
+                ],
+                "additionalProperties": false
+              },
+              "minItems": 0,
+              "maxItems": 199,
+              "description": "相邻片段衔接说明，不自动执行转场"
+            },
+            "notes": {
+              "type": "string",
+              "minLength": 0,
+              "maxLength": 8000,
+              "description": "剪辑方案说明；保存不采用输出或导出成片"
+            }
+          },
+          "required": [
+            "id",
+            "expectedProductionRevision",
+            "episodeId",
+            "expectedEditRevision",
+            "clips",
+            "audioTracks",
+            "cutNotes",
+            "notes"
+          ],
+          "additionalProperties": false
+        }
+      },
+      {
+        "name": "record_review",
+        "description": "保存有范围、有证据的评审者结论，并按内容依赖推导是否过期。同范围同类别的新结论取代旧结论；supported 不等于宿主认证的艺术质量。",
+        "risk": "medium",
+        "schema": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$",
+              "description": "作品 ID"
+            },
+            "expectedProductionRevision": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991,
+              "description": "读取到的当前作品版本；在写入队列内检查"
+            },
+            "scope": {
+              "type": "object",
+              "properties": {
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "episode",
+                    "shot",
+                    "cut",
+                    "sequence"
+                  ],
+                  "description": "评审范围"
+                },
+                "episodeId": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$",
+                  "description": "剧集 ID；镜头评审可由 shotId 推导，不适用传 null"
+                },
+                "shotId": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$",
+                  "description": "镜头评审的镜头 ID；不适用传 null"
+                },
+                "fromClipId": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$",
+                  "description": "切点评审前片段；不适用传 null"
+                },
+                "toClipId": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$",
+                  "description": "切点评审后片段；不适用传 null"
+                }
+              },
+              "required": [
+                "kind"
+              ],
+              "additionalProperties": false
+            },
+            "category": {
+              "type": "string",
+              "enum": [
+                "text",
+                "technical",
+                "visual",
+                "audio",
+                "continuity"
+              ],
+              "description": "评审类别"
+            },
+            "verdict": {
+              "type": "string",
+              "enum": [
+                "supported",
+                "needs-revision",
+                "not-verified"
+              ],
+              "description": "评审者的结论，不是宿主质量认证"
+            },
+            "evidence": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "mediaId": {
+                    "type": "string",
+                    "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$",
+                    "description": "与评审范围有关的已登记素材 ID"
+                  },
+                  "startSeconds": {
+                    "type": [
+                      "number",
+                      "null"
+                    ],
+                    "minimum": 0,
+                    "maximum": 86400,
+                    "description": "证据起点（秒）；静态图片可 null"
+                  },
+                  "endSeconds": {
+                    "type": [
+                      "number",
+                      "null"
+                    ],
+                    "minimum": 0,
+                    "maximum": 86400,
+                    "description": "证据终点（秒）；音视频通过结论必须填实际观察范围"
+                  },
+                  "note": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 8000,
+                    "description": "实际观察到的证据"
+                  }
+                },
+                "required": [
+                  "mediaId",
+                  "note"
+                ],
+                "additionalProperties": false
+              },
+              "minItems": 0,
+              "maxItems": 512,
+              "description": "已观察的范围内素材证据；通过的非文本评审必须提供"
+            },
+            "findings": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 8000,
+              "description": "具体发现与依据"
+            },
+            "nextAction": {
+              "type": "string",
+              "minLength": 0,
+              "maxLength": 8000,
+              "description": "下一步动作；supported 时可为空"
+            }
+          },
+          "required": [
+            "id",
+            "expectedProductionRevision",
+            "scope",
+            "category",
+            "verdict",
+            "evidence",
+            "findings",
+            "nextAction"
+          ],
+          "additionalProperties": false
+        }
+      },
+      {
+        "name": "save_revision_plan",
+        "description": "仅暂存具体修订方案及宿主捕获的修改前后值，不改剧本、镜头或素材。replacementJson 是一个字段值的 JSON 编码字符串。意图字段限制不是语义保持证明；保留约束仍须 Agent 核验。",
+        "risk": "medium",
+        "schema": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$",
+              "maxLength": 128,
+              "description": "作品 ID"
+            },
+            "expectedProductionRevision": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991,
+              "description": "最新作品版本；在写入队列内检查"
+            },
+            "title": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200,
+              "description": "方案标题"
+            },
+            "intent": {
+              "type": "string",
+              "enum": [
+                "wording",
+                "visual",
+                "pacing",
+                "story"
+              ]
+            },
+            "instruction": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 8000,
+              "description": "用户要求和修订范围"
+            },
+            "preserve": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 4000,
+                "description": "必须保留的约束"
+              },
+              "minItems": 1,
+              "maxItems": 100
+            },
+            "reviewIds": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$",
+                "maxLength": 128,
+                "description": "当前且未被替代的真实评审 ID；没有则传空数组"
+              },
+              "minItems": 0,
+              "maxItems": 100
+            },
+            "changes": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "targetType": {
+                    "type": "string",
+                    "enum": [
+                      "production",
+                      "episode",
+                      "beat",
+                      "asset",
+                      "shot"
+                    ]
+                  },
+                  "targetId": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$",
+                    "maxLength": 128,
+                    "description": "production 必须传 null；其余传本作品的真实对象 ID"
+                  },
+                  "field": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 80,
+                    "description": "允许修改的单一字段；设定集只允许 projectBible.background/rules/timeline/characters"
+                  },
+                  "replacementJson": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 220000,
+                    "description": "替换值的 JSON 编码字符串；文本示例：\"新对白\"，数字：2.5，完整计划：{\"effects\":\"风\",\"music\":\"\"}，清除计划：null。只解析 JSON。"
+                  },
+                  "sourceIssue": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 4000,
+                    "description": "实际问题或编辑意见引用；不是虚构评审 ID"
+                  },
+                  "reason": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 4000,
+                    "description": "此项修改的理由"
+                  },
+                  "acceptanceCriteria": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 4000,
+                    "description": "应用后仍需核验的验收标准；不自动标记通过"
+                  }
+                },
+                "required": [
+                  "targetType",
+                  "targetId",
+                  "field",
+                  "replacementJson",
+                  "sourceIssue",
+                  "reason",
+                  "acceptanceCriteria"
+                ],
+                "additionalProperties": false
+              },
+              "minItems": 1,
+              "maxItems": 100
+            }
+          },
+          "required": [
+            "id",
+            "expectedProductionRevision",
+            "title",
+            "intent",
+            "instruction",
+            "preserve",
+            "reviewIds",
+            "changes"
+          ],
+          "additionalProperties": false
+        }
+      },
+      {
+        "name": "get_revision_plan",
+        "description": "只读获取修订方案、精确修改前后值、影响范围及当前可应用／还原状态，不写入旧作品。",
+        "risk": "low",
+        "schema": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$",
+              "maxLength": 128,
+              "description": "作品 ID"
+            },
+            "planId": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$",
+              "maxLength": 128,
+              "description": "修订方案 ID"
+            }
+          },
+          "required": [
+            "id",
+            "planId"
+          ],
+          "additionalProperties": false
+        }
+      },
+      {
+        "name": "apply_revision_plan",
+        "description": "在版本、内容及引用评审均匹配时原子应用已保存方案。须 confirm=true 和 Agent 对当前用户授权的说明，并遵守宿主权限审批；不会生成素材或自动判定评审通过。",
+        "risk": "medium",
+        "schema": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$",
+              "maxLength": 128,
+              "description": "作品 ID"
+            },
+            "expectedProductionRevision": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991,
+              "description": "最新作品版本；在写入队列内检查"
+            },
+            "planId": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$",
+              "maxLength": 128,
+              "description": "已保存的修订方案 ID"
+            },
+            "confirm": {
+              "type": "boolean",
+              "description": "必须为 true；Agent 声明已取得针对本作品及方案的当前用户授权"
+            },
+            "authorization": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 4000,
+              "description": "Agent 引述或说明当前用户对本作品及方案的授权；不是宿主认证的用户同意，仍须遵守宿主权限审批"
+            }
+          },
+          "required": [
+            "id",
+            "expectedProductionRevision",
+            "planId",
+            "confirm",
+            "authorization"
+          ],
+          "additionalProperties": false
+        }
+      },
+      {
+        "name": "restore_revision_plan",
+        "description": "仅当应用后内容及镜头版本未改变时还原该方案修改的字段。保留素材、评审及输出历史，镜头版本继续递增；不能跨后续内容修改强制回滚或重复还原。须明确授权及宿主审批。",
+        "risk": "medium",
+        "schema": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$",
+              "maxLength": 128,
+              "description": "作品 ID"
+            },
+            "expectedProductionRevision": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991,
+              "description": "最新作品版本；在写入队列内检查"
+            },
+            "planId": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$",
+              "maxLength": 128,
+              "description": "已保存的修订方案 ID"
+            },
+            "confirm": {
+              "type": "boolean",
+              "description": "必须为 true；Agent 声明已取得针对本作品及方案的当前用户授权"
+            },
+            "authorization": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 4000,
+              "description": "Agent 引述或说明当前用户对本作品及方案的授权；不是宿主认证的用户同意，仍须遵守宿主权限审批"
+            }
+          },
+          "required": [
+            "id",
+            "expectedProductionRevision",
+            "planId",
+            "confirm",
+            "authorization"
+          ],
+          "additionalProperties": false
+        }
+      },
+      {
+        "name": "get_workflow_status",
+        "description": "检查 Bone 影视工厂完整创作链：简介、分集正文、脚本节拍、分镜映射、视频/声音/衔接计划、首尾帧图片和最终输出。返回缺口、下一步工具和各镜头状态；开始/继续创作前与完成后都调用。",
+        "risk": "low",
+        "schema": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "id"
+          ],
+          "additionalProperties": false
+        }
+      },
+      {
+        "name": "list_productions",
+        "description": "列出 Bone 影视工厂中的全部影像作品（标题、类型、集数、镜头数、更新时间）。",
+        "risk": "low",
+        "schema": {
+          "type": "object",
+          "properties": {},
+          "additionalProperties": false
+        }
+      },
+      {
+        "name": "get_production",
+        "description": "读取作品设定、完整剧本 prose、脚本 beats、资产、分镜、素材测量 mediaInspections、剪辑方案 editPlans、评审 reviews、修订方案 revisionPlans 及派生 workflow。修改前先读取当前 revision；评审不授权改稿，duration 是成片预算。",
+        "risk": "low",
+        "schema": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "description": "作品 id"
+            }
+          },
+          "required": [
+            "id"
+          ],
+          "additionalProperties": false
+        }
+      },
+      {
+        "name": "create_production",
+        "description": "创建 Bone 影视作品，kind 为 comic/film/promo/image。projectBible 保存世界背景、规则和历史时间线；arc 保存全剧主线。人物档案与生图提示词通过 add_assets/update_asset 保存到各角色资产。",
+        "risk": "medium",
+        "schema": {
+          "type": "object",
+          "properties": {
+            "title": {
+              "type": "string",
+              "description": "作品名称"
+            },
+            "kind": {
+              "type": "string",
+              "enum": [
+                "comic",
+                "film",
+                "promo",
+                "image"
+              ],
+              "description": "作品类型"
+            },
+            "brief": {
+              "type": "string",
+              "description": "作品简介：核心内容、题材与受众"
+            },
+            "arc": {
+              "type": "string",
+              "description": "全片故事线：主线因果与分集钩子如何串联（剧本按集存，这是跨集视角）"
+            },
+            "projectBible": {
+              "type": "object",
+              "description": "项目设定，按栏目局部更新；省略保留，空字符串清空该栏。每栏最多20000字符。全剧主线使用 arc，不在此重复。",
+              "properties": {
+                "background": {
+                  "type": "string",
+                  "maxLength": 20000,
+                  "description": "世界背景：时代、地域、社会结构、势力与核心冲突的起因。"
+                },
+                "rules": {
+                  "type": "string",
+                  "maxLength": 20000,
+                  "description": "世界规则：触发条件、能力边界、代价、例外与角色知情约束。"
+                },
+                "timeline": {
+                  "type": "string",
+                  "maxLength": 20000,
+                  "description": "历史时间线：按世界内真实发生顺序记录事件、因果与后果；区分观众获知顺序。"
+                },
+                "characters": {
+                  "type": "string",
+                  "maxLength": 20000,
+                  "description": "兼容旧版集中人物资料；新人物档案应保存到各角色资产 profile。旧资料归档核对完成后可清空，未归档内容在资产区展示。"
+                }
+              },
+              "additionalProperties": false
+            },
+            "style": {
+              "type": "string",
+              "description": "美术风格，如“赛博朋克”“水墨”“厚涂”"
+            },
+            "ratio": {
+              "type": "string",
+              "description": "画面比例，默认 16:9"
+            },
+            "fps": {
+              "type": "number",
+              "description": "帧率，默认 24"
+            },
+            "voice": {
+              "type": "string",
+              "description": "配音要求"
+            },
+            "music": {
+              "type": "string",
+              "description": "音乐要求"
+            }
+          },
+          "required": [
+            "title",
+            "kind"
+          ],
+          "additionalProperties": false
+        }
+      },
+      {
+        "name": "write_script",
+        "description": "写一集完整可拍摄剧本 prose：按叙事顺序写全场次、可见动作和精确对白，篇幅服从目标时长，不能用一句梗概或节拍表代替。多集创作先读取项目设定集和分集规划。按 episodeId 更新或新建；结构化脚本节拍另用 write_episodes 的 beats 拆解。",
+        "risk": "medium",
+        "schema": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "description": "作品 id"
+            },
+            "episodeId": {
+              "type": "string",
+              "description": "可选：更新已有集；缺省则新建一集"
+            },
+            "title": {
+              "type": "string",
+              "description": "集数名称"
+            },
+            "logline": {
+              "type": "string"
+            },
+            "audiencePromise": {
+              "type": "string"
+            },
+            "hook": {
+              "type": "string"
+            },
+            "turningPoint": {
+              "type": "string"
+            },
+            "payoff": {
+              "type": "string"
+            },
+            "targetDurationSeconds": {
+              "type": "number",
+              "description": "本集目标时长（秒）"
+            },
+            "productionNotes": {
+              "type": "string"
+            },
+            "prose": {
+              "type": "string",
+              "description": "完整可拍摄正文：场次标识、场景、动作、反应及完整对白按叙事顺序写成；篇幅与时间预算匹配，不强制字数。梗概、分集大纲和 beats 不能代替正文。"
+            }
+          },
+          "required": [
+            "id",
+            "title"
+          ],
+          "additionalProperties": false
+        }
+      },
+      {
+        "name": "write_episodes",
+        "description": "一次性写入整部剧本：按顺序提交多集，每集含标题与七要素，以及有序的 beats 叙事节拍（每个节拍含 purpose 叙事功能、dramaticQuestion 观众问题、synopsis 节拍概述、visualAction 视觉动作方向、dialogue 对白意图、sound 声音、continuity 连续性）。缺省 episodeId 时新建集；给出 episodeId 时更新该集。注意：传入的 beats 数组会整体替换该集节拍列表，只想改一个节拍时也要把其余节拍一并带上（用 beatId 指定被改的那个）。",
+        "risk": "medium",
+        "schema": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "description": "作品 id"
+            },
+            "episodes": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 20,
+              "items": {
+                "type": "object",
+                "properties": {
+                  "episodeId": {
+                    "type": "string",
+                    "description": "可选：更新已有集；缺省则新建"
+                  },
+                  "title": {
+                    "type": "string",
+                    "description": "集数名称"
+                  },
+                  "logline": {
+                    "type": "string"
+                  },
+                  "audiencePromise": {
+                    "type": "string"
+                  },
+                  "hook": {
+                    "type": "string"
+                  },
+                  "turningPoint": {
+                    "type": "string"
+                  },
+                  "payoff": {
+                    "type": "string"
+                  },
+                  "targetDurationSeconds": {
+                    "type": "number"
+                  },
+                  "productionNotes": {
+                    "type": "string"
+                  },
+                  "prose": {
+                    "type": "string",
+                    "description": "完整可拍摄正文：场次标识、场景、动作、反应及完整对白按叙事顺序写成；篇幅与时间预算匹配，不强制字数。梗概、分集大纲和 beats 不能代替正文。"
+                  },
+                  "beats": {
+                    "type": "array",
+                    "description": "有序叙事节拍；数组顺序即剧本顺序。缺省 beatId 时新建成节拍。",
+                    "maxItems": 40,
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "beatId": {
+                          "type": "string",
+                          "description": "可选：更新已有节拍"
+                        },
+                        "title": {
+                          "type": "string",
+                          "description": "节拍名称"
+                        },
+                        "purpose": {
+                          "type": "string",
+                          "enum": [
+                            "hook",
+                            "setup",
+                            "inciting-incident",
+                            "rising-action",
+                            "reveal",
+                            "turn",
+                            "resolution",
+                            "tag"
+                          ],
+                          "description": "叙事功能"
+                        },
+                        "dramaticQuestion": {
+                          "type": "string",
+                          "description": "观众此刻追问或期待的问题"
+                        },
+                        "synopsis": {
+                          "type": "string",
+                          "description": "事件因果与信息变化，不代替分镜动作"
+                        },
+                        "visualAction": {
+                          "type": "string",
+                          "description": "给分镜动作与表演的视觉执行方向"
+                        },
+                        "dialogue": {
+                          "type": "string",
+                          "description": "对白或旁白意图；精确台词写入镜头"
+                        },
+                        "sound": {
+                          "type": "string",
+                          "description": "声音意图；精确音效写入镜头"
+                        },
+                        "continuity": {
+                          "type": "string",
+                          "description": "跨镜连续性约束"
+                        }
+                      },
+                      "required": [
+                        "title"
+                      ],
+                      "additionalProperties": false
+                    }
+                  }
+                },
+                "required": [
+                  "title"
+                ],
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": [
+            "id",
+            "episodes"
+          ],
+          "additionalProperties": false
+        }
+      },
+      {
+        "name": "add_assets",
+        "description": "登记角色、场景、道具等资产。description 写资产介绍，profile 写人物档案或详细设定，imagePrompt/negativePrompt 写生图提示词与避免项。人物档案按角色分别保存，不集中写入项目设定。",
+        "risk": "medium",
+        "schema": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "description": "作品 id"
+            },
+            "assets": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 32,
+              "items": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "type": {
+                    "type": "string",
+                    "description": "业务类型：角色/场景/产品/道具/风格/品牌/声音"
+                  },
+                  "description": {
+                    "type": "string",
+                    "description": "外观、一致性或使用约束"
+                  },
+                  "profile": {
+                    "type": "string",
+                    "maxLength": 20000,
+                    "description": "资产详细设定；角色填写目标、动机、秘密、关系与成长线，其他类型填写背景及用途。"
+                  },
+                  "imagePrompt": {
+                    "type": "string",
+                    "maxLength": 8000,
+                    "description": "资产生图提示词：稳定外观、构图、视角、材质、光线与风格。声音资产可留空。"
+                  },
+                  "negativePrompt": {
+                    "type": "string",
+                    "maxLength": 8000,
+                    "description": "生图避免项与一致性约束；仅在生成工具支持时作为负向提示词。"
+                  },
+                  "locked": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "name",
+                  "type"
+                ],
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": [
+            "id",
+            "assets"
+          ],
+          "additionalProperties": false
+        }
+      },
+      {
+        "name": "add_shots",
+        "description": "按本集脚本节拍创建分镜。每镜必须 title、scene、beatId，episodeId 缺省仅在唯一剧集时自动归属。可写 motion、dialogue、assetIds、videoPlan、soundDesign、continuityPlan；首尾帧资产必须已登记并加入 assetIds。先有正文和节拍，再拆镜头。",
+        "risk": "medium",
+        "schema": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "description": "作品 id"
+            },
+            "episodeId": {
+              "type": "string",
+              "description": "可选：归属的剧集 id"
+            },
+            "shots": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 50,
+              "items": {
+                "type": "object",
+                "properties": {
+                  "title": {
+                    "type": "string"
+                  },
+                  "duration": {
+                    "type": "number",
+                    "description": "成片剪辑预算秒数，保留小数；缺省4（图片0）。生成长度另存 productionPlan。"
+                  },
+                  "scene": {
+                    "type": "string",
+                    "description": "画面描述和场景"
+                  },
+                  "motion": {
+                    "type": "string",
+                    "description": "镜头运动与主体动作"
+                  },
+                  "dialogue": {
+                    "type": "string",
+                    "description": "对白、旁白或字幕"
+                  },
+                  "assetIds": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "beatId": {
+                    "type": "string",
+                    "description": "必填：本集某个叙事节拍的 id（先用 write_episodes 写节拍）"
+                  },
+                  "productionPlan": {
+                    "type": [
+                      "object",
+                      "null"
+                    ],
+                    "description": "分镜制作与剪辑空间计划，整体替换；null 清除。duration 仍是成片预算，这里的生成长度不能相加当成成片长度。",
+                    "properties": {
+                      "sourceScene": {
+                        "type": "string",
+                        "maxLength": 8000,
+                        "description": "对应完整剧本场次标识"
+                      },
+                      "purpose": {
+                        "type": "string",
+                        "maxLength": 8000,
+                        "description": "本镜必须传达的叙事信息"
+                      },
+                      "requiredEvents": {
+                        "type": "array",
+                        "minItems": 1,
+                        "maxItems": 12,
+                        "items": {
+                          "type": "string",
+                          "maxLength": 8000
+                        },
+                        "description": "剪辑不可省略的可见事件、接触或结果"
+                      },
+                      "generationDurationSeconds": {
+                        "type": "number",
+                        "exclusiveMinimum": 0,
+                        "maximum": 600,
+                        "description": "计划申请的源片长度，需按实际模型能力选档；不是实际测得时长"
+                      },
+                      "headHandleSeconds": {
+                        "type": "number",
+                        "minimum": 0,
+                        "description": "期望动作前可剪留量，需生成后核实"
+                      },
+                      "tailHandleSeconds": {
+                        "type": "number",
+                        "minimum": 0,
+                        "description": "期望动作后可剪留量；首尾留量和须小于生成时长"
+                      },
+                      "retimePolicy": {
+                        "type": "string",
+                        "enum": [
+                          "allowed",
+                          "silent-only",
+                          "forbidden"
+                        ],
+                        "description": "允许变速／仅不使用源音频时允许／禁止变速。允许不代表变速后质量通过"
+                      },
+                      "editingNotes": {
+                        "type": "string",
+                        "maxLength": 8000,
+                        "description": "覆盖、拆切、对白与变速限制；不可删除的动作依据"
+                      }
+                    },
+                    "required": [
+                      "sourceScene",
+                      "purpose",
+                      "requiredEvents",
+                      "generationDurationSeconds",
+                      "headHandleSeconds",
+                      "tailHandleSeconds",
+                      "retimePolicy",
+                      "editingNotes"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "videoPlan": {
+                    "type": [
+                      "object",
+                      "null"
+                    ],
+                    "description": "视频制作计划，整体替换；null 清除计划。首帧 null 表示使用镜头已采用画面。",
+                    "properties": {
+                      "mode": {
+                        "type": "string",
+                        "enum": [
+                          "text-to-video",
+                          "image-to-video",
+                          "first-last-frame"
+                        ]
+                      },
+                      "firstFrameAssetId": {
+                        "type": [
+                          "string",
+                          "null"
+                        ],
+                        "description": "本作品资产 id；必须同时加入镜头 assetIds"
+                      },
+                      "lastFrameAssetId": {
+                        "type": [
+                          "string",
+                          "null"
+                        ],
+                        "description": "本作品资产 id；必须同时加入镜头 assetIds"
+                      },
+                      "transitionIn": {
+                        "type": "string",
+                        "enum": [
+                          "hard-cut",
+                          "match-cut",
+                          "dissolve"
+                        ]
+                      },
+                      "rationale": {
+                        "type": "string",
+                        "maxLength": 8000,
+                        "description": "为何选择这种生成模式与转场"
+                      }
+                    },
+                    "required": [
+                      "mode",
+                      "rationale"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "soundDesign": {
+                    "type": [
+                      "object",
+                      "null"
+                    ],
+                    "description": "镜头声音设计，整体替换；对白仍写 dialogue；null 清除。",
+                    "properties": {
+                      "effects": {
+                        "type": "string",
+                        "maxLength": 8000
+                      },
+                      "music": {
+                        "type": "string",
+                        "maxLength": 8000
+                      }
+                    },
+                    "required": [
+                      "effects",
+                      "music"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "continuityPlan": {
+                    "type": [
+                      "object",
+                      "null"
+                    ],
+                    "description": "镜头衔接设计，整体替换；null 清除。",
+                    "properties": {
+                      "entryState": {
+                        "type": "string",
+                        "maxLength": 8000
+                      },
+                      "exitState": {
+                        "type": "string",
+                        "maxLength": 8000
+                      },
+                      "rationale": {
+                        "type": "string",
+                        "maxLength": 8000
+                      },
+                      "audioTransition": {
+                        "type": "string",
+                        "enum": [
+                          "hard-cut",
+                          "carry-over",
+                          "prelap",
+                          "dialogue-carry"
+                        ]
+                      },
+                      "anchors": {
+                        "type": "array",
+                        "maxItems": 12,
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "phase": {
+                              "type": "string",
+                              "enum": [
+                                "start",
+                                "development",
+                                "contact",
+                                "peak",
+                                "result",
+                                "reaction",
+                                "exit"
+                              ]
+                            },
+                            "state": {
+                              "type": "string",
+                              "maxLength": 8000
+                            },
+                            "assetId": {
+                              "type": [
+                                "string",
+                                "null"
+                              ],
+                              "description": "本作品资产 id；必须同时加入镜头 assetIds"
+                            }
+                          },
+                          "required": [
+                            "phase",
+                            "state"
+                          ],
+                          "additionalProperties": false
+                        }
+                      }
+                    },
+                    "required": [
+                      "entryState",
+                      "exitState",
+                      "rationale"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "required": [
+                  "title",
+                  "scene",
+                  "beatId"
+                ],
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": [
+            "id",
+            "shots"
+          ],
+          "additionalProperties": false
+        }
+      },
+      {
+        "name": "update_production",
+        "description": "修改作品设定、全剧主线 arc 与 projectBible（世界背景、规则、历史时间线）。只传要改的字段；projectBible 按栏目合并，省略保留、空字符串清空。人物档案请用 update_asset 保存到角色 profile。",
+        "risk": "medium",
+        "schema": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "description": "作品 id"
+            },
+            "title": {
+              "type": "string"
+            },
+            "kind": {
+              "type": "string",
+              "enum": [
+                "comic",
+                "film",
+                "promo",
+                "image"
+              ]
+            },
+            "brief": {
+              "type": "string"
+            },
+            "arc": {
+              "type": "string",
+              "description": "全片故事线"
+            },
+            "projectBible": {
+              "type": "object",
+              "description": "项目设定，按栏目局部更新；省略保留，空字符串清空该栏。每栏最多20000字符。全剧主线使用 arc，不在此重复。",
+              "properties": {
+                "background": {
+                  "type": "string",
+                  "maxLength": 20000,
+                  "description": "世界背景：时代、地域、社会结构、势力与核心冲突的起因。"
+                },
+                "rules": {
+                  "type": "string",
+                  "maxLength": 20000,
+                  "description": "世界规则：触发条件、能力边界、代价、例外与角色知情约束。"
+                },
+                "timeline": {
+                  "type": "string",
+                  "maxLength": 20000,
+                  "description": "历史时间线：按世界内真实发生顺序记录事件、因果与后果；区分观众获知顺序。"
+                },
+                "characters": {
+                  "type": "string",
+                  "maxLength": 20000,
+                  "description": "兼容旧版集中人物资料；新人物档案应保存到各角色资产 profile。旧资料归档核对完成后可清空，未归档内容在资产区展示。"
+                }
+              },
+              "additionalProperties": false
+            },
+            "style": {
+              "type": "string",
+              "description": "美术风格"
+            },
+            "ratio": {
+              "type": "string"
+            },
+            "fps": {
+              "type": "number"
+            },
+            "voice": {
+              "type": "string"
+            },
+            "music": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "id"
+          ],
+          "additionalProperties": false
+        }
+      },
+      {
+        "name": "update_shot",
+        "description": "修改镜头画面、运镜、对白、成片预算 duration（保留小数）、资产与制作计划。productionPlan/videoPlan/soundDesign/continuityPlan 整体替换，null 清除；生成长度与留量存 productionPlan。跨集修改须指定 beatId；建议 expectedShotRevision 防止覆盖新设定。",
+        "risk": "medium",
+        "schema": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "description": "作品 id"
+            },
+            "shotId": {
+              "type": "string",
+              "description": "镜头 id（用 get_production 查）"
+            },
+            "title": {
+              "type": "string"
+            },
+            "scene": {
+              "type": "string",
+              "description": "画面描述和场景"
+            },
+            "motion": {
+              "type": "string",
+              "description": "镜头运动与主体动作"
+            },
+            "dialogue": {
+              "type": "string",
+              "description": "对白、旁白或字幕"
+            },
+            "duration": {
+              "type": "number",
+              "description": "成片剪辑预算秒数，保留小数；不是生成长度"
+            },
+            "assetIds": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "整体替换引用资产"
+            },
+            "episodeId": {
+              "type": "string",
+              "description": "改归属集时必须同时给出该集的 beatId"
+            },
+            "beatId": {
+              "type": "string",
+              "description": "改映射的叙事节拍；不可为空（镜头必须属于一个节拍）"
+            },
+            "expectedShotRevision": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "可选乐观锁：get_production 返回的 shotStates[shotId].revision"
+            },
+            "productionPlan": {
+              "type": [
+                "object",
+                "null"
+              ],
+              "description": "分镜制作与剪辑空间计划，整体替换；null 清除。duration 仍是成片预算，这里的生成长度不能相加当成成片长度。",
+              "properties": {
+                "sourceScene": {
+                  "type": "string",
+                  "maxLength": 8000,
+                  "description": "对应完整剧本场次标识"
+                },
+                "purpose": {
+                  "type": "string",
+                  "maxLength": 8000,
+                  "description": "本镜必须传达的叙事信息"
+                },
+                "requiredEvents": {
+                  "type": "array",
+                  "minItems": 1,
+                  "maxItems": 12,
+                  "items": {
+                    "type": "string",
+                    "maxLength": 8000
+                  },
+                  "description": "剪辑不可省略的可见事件、接触或结果"
+                },
+                "generationDurationSeconds": {
+                  "type": "number",
+                  "exclusiveMinimum": 0,
+                  "maximum": 600,
+                  "description": "计划申请的源片长度，需按实际模型能力选档；不是实际测得时长"
+                },
+                "headHandleSeconds": {
+                  "type": "number",
+                  "minimum": 0,
+                  "description": "期望动作前可剪留量，需生成后核实"
+                },
+                "tailHandleSeconds": {
+                  "type": "number",
+                  "minimum": 0,
+                  "description": "期望动作后可剪留量；首尾留量和须小于生成时长"
+                },
+                "retimePolicy": {
+                  "type": "string",
+                  "enum": [
+                    "allowed",
+                    "silent-only",
+                    "forbidden"
+                  ],
+                  "description": "允许变速／仅不使用源音频时允许／禁止变速。允许不代表变速后质量通过"
+                },
+                "editingNotes": {
+                  "type": "string",
+                  "maxLength": 8000,
+                  "description": "覆盖、拆切、对白与变速限制；不可删除的动作依据"
+                }
+              },
+              "required": [
+                "sourceScene",
+                "purpose",
+                "requiredEvents",
+                "generationDurationSeconds",
+                "headHandleSeconds",
+                "tailHandleSeconds",
+                "retimePolicy",
+                "editingNotes"
+              ],
+              "additionalProperties": false
+            },
+            "videoPlan": {
+              "type": [
+                "object",
+                "null"
+              ],
+              "description": "视频制作计划，整体替换；null 清除计划。首帧 null 表示使用镜头已采用画面。",
+              "properties": {
+                "mode": {
+                  "type": "string",
+                  "enum": [
+                    "text-to-video",
+                    "image-to-video",
+                    "first-last-frame"
+                  ]
+                },
+                "firstFrameAssetId": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "本作品资产 id；必须同时加入镜头 assetIds"
+                },
+                "lastFrameAssetId": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "本作品资产 id；必须同时加入镜头 assetIds"
+                },
+                "transitionIn": {
+                  "type": "string",
+                  "enum": [
+                    "hard-cut",
+                    "match-cut",
+                    "dissolve"
+                  ]
+                },
+                "rationale": {
+                  "type": "string",
+                  "maxLength": 8000,
+                  "description": "为何选择这种生成模式与转场"
+                }
+              },
+              "required": [
+                "mode",
+                "rationale"
+              ],
+              "additionalProperties": false
+            },
+            "soundDesign": {
+              "type": [
+                "object",
+                "null"
+              ],
+              "description": "镜头声音设计，整体替换；对白仍写 dialogue；null 清除。",
+              "properties": {
+                "effects": {
+                  "type": "string",
+                  "maxLength": 8000
+                },
+                "music": {
+                  "type": "string",
+                  "maxLength": 8000
+                }
+              },
+              "required": [
+                "effects",
+                "music"
+              ],
+              "additionalProperties": false
+            },
+            "continuityPlan": {
+              "type": [
+                "object",
+                "null"
+              ],
+              "description": "镜头衔接设计，整体替换；null 清除。",
+              "properties": {
+                "entryState": {
+                  "type": "string",
+                  "maxLength": 8000
+                },
+                "exitState": {
+                  "type": "string",
+                  "maxLength": 8000
+                },
+                "rationale": {
+                  "type": "string",
+                  "maxLength": 8000
+                },
+                "audioTransition": {
+                  "type": "string",
+                  "enum": [
+                    "hard-cut",
+                    "carry-over",
+                    "prelap",
+                    "dialogue-carry"
+                  ]
+                },
+                "anchors": {
+                  "type": "array",
+                  "maxItems": 12,
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "phase": {
+                        "type": "string",
+                        "enum": [
+                          "start",
+                          "development",
+                          "contact",
+                          "peak",
+                          "result",
+                          "reaction",
+                          "exit"
+                        ]
+                      },
+                      "state": {
+                        "type": "string",
+                        "maxLength": 8000
+                      },
+                      "assetId": {
+                        "type": [
+                          "string",
+                          "null"
+                        ],
+                        "description": "本作品资产 id；必须同时加入镜头 assetIds"
+                      }
+                    },
+                    "required": [
+                      "phase",
+                      "state"
+                    ],
+                    "additionalProperties": false
+                  }
+                }
+              },
+              "required": [
+                "entryState",
+                "exitState",
+                "rationale"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "id",
+            "shotId"
+          ],
+          "additionalProperties": false
+        }
+      },
+      {
+        "name": "delete_shot",
+        "description": "删除一个镜头（从分镜序列移除，并清除其镜头状态）。",
+        "risk": "medium",
+        "schema": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "description": "作品 id"
+            },
+            "shotId": {
+              "type": "string",
+              "description": "镜头 id"
+            }
+          },
+          "required": [
+            "id",
+            "shotId"
+          ],
+          "additionalProperties": false
+        }
+      },
+      {
+        "name": "move_shot",
+        "description": "调整镜头在分镜序列中的位置（数组顺序即同集镜头顺序）。toIndex 从 0 开始。",
+        "risk": "medium",
+        "schema": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "description": "作品 id"
+            },
+            "shotId": {
+              "type": "string",
+              "description": "要移动的镜头 id"
+            },
+            "toIndex": {
+              "type": "number",
+              "description": "目标位置，0-based"
+            }
+          },
+          "required": [
+            "id",
+            "shotId",
+            "toIndex"
+          ],
+          "additionalProperties": false
+        }
+      },
+      {
+        "name": "update_asset",
+        "description": "修改资产介绍、人物档案 profile、生图提示词 imagePrompt、避免项 negativePrompt 或锁定状态。省略保留，空字符串清空指定字段；改动将引用镜头标记待更新。已定稿资产按用户授权修改。",
+        "risk": "medium",
+        "schema": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "description": "作品 id"
+            },
+            "assetId": {
+              "type": "string",
+              "description": "资产 id"
+            },
+            "name": {
+              "type": "string"
+            },
+            "type": {
+              "type": "string"
+            },
+            "description": {
+              "type": "string"
+            },
+            "profile": {
+              "type": "string",
+              "maxLength": 20000,
+              "description": "资产详细设定；角色填写目标、动机、秘密、关系与成长线，其他类型填写背景及用途。"
+            },
+            "imagePrompt": {
+              "type": "string",
+              "maxLength": 8000,
+              "description": "资产生图提示词：稳定外观、构图、视角、材质、光线与风格。声音资产可留空。"
+            },
+            "negativePrompt": {
+              "type": "string",
+              "maxLength": 8000,
+              "description": "生图避免项与一致性约束；仅在生成工具支持时作为负向提示词。"
+            },
+            "locked": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "id",
+            "assetId"
+          ],
+          "additionalProperties": false
+        }
+      },
+      {
+        "name": "delete_asset",
+        "description": "删除一个资产，并从所有引用它的镜头中移除该引用。",
+        "risk": "medium",
+        "schema": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "description": "作品 id"
+            },
+            "assetId": {
+              "type": "string",
+              "description": "资产 id"
+            }
+          },
+          "required": [
+            "id",
+            "assetId"
+          ],
+          "additionalProperties": false
+        }
+      },
+      {
+        "name": "delete_production",
+        "description": "永久删除一个影像作品及其全部剧本、资产和分镜。不可恢复，必须显式传 confirm: true；删除前先向用户确认。",
+        "risk": "high",
+        "schema": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "description": "作品 id"
+            },
+            "confirm": {
+              "type": "boolean",
+              "description": "必须为 true 才会执行删除"
+            }
+          },
+          "required": [
+            "id",
+            "confirm"
+          ],
+          "additionalProperties": false
+        }
+      }
+    ]
+  },
+  "fs": {
+    "read": {
+      "scope": [
+        "bone-media/**"
+      ]
+    }
+  },
+  "permissions": [
+    "agent.prompt.inject",
+    "fs.read",
+    "ui.view",
+    "agent.tool.register",
+    "clipboard.write"
+  ],
+  "engines": {
+    "piDesktop": ">=0.1.0"
+  },
+  "activationEvents": [
+    "onStartup"
+  ]
+}

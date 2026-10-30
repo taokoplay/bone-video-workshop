@@ -1,0 +1,52 @@
+.bw-bible { min-width: 0; }
+.bw-bible-head { gap: 12px; flex-wrap: wrap; }
+.bw-bible-heading { display: flex; align-items: baseline; gap: 12px; }
+.bw-bible-heading .vp-muted { font-size: 10px; white-space: nowrap; }
+.bw-bible-tabs { display: flex; gap: 6px; min-width: 0; max-width: 100%; overflow-x: auto; padding: 0 0 12px; scrollbar-width: thin; }
+.bw-bible-tab { display: inline-flex; align-items: center; gap: 8px; flex-shrink: 0; padding: 8px 12px; border: 0; border-radius: 7px; background: transparent; color: hsl(var(--muted-foreground)); font: inherit; font-size: 11px; cursor: pointer; }
+.bw-bible-tab:hover { background: hsl(var(--muted) / 0.6); color: hsl(var(--foreground)); }
+.bw-bible-tab[aria-selected="true"] { background: hsl(var(--muted)); color: hsl(var(--foreground)); }
+.bw-bible-tab:focus-visible, .bw-bible-panel:focus-visible { outline: 2px solid hsl(var(--ring)); outline-offset: -2px; }
+.bw-bible-dot { width: 5px; height: 5px; border-radius: 50%; background: hsl(var(--muted-foreground) / 0.35); }
+.bw-bible-dot.is-filled { background: hsl(var(--tab-active)); }
+.bw-bible-panel { min-width: 0; min-height: 180px; max-height: 440px; overflow-y: auto; overscroll-behavior-y: auto; scrollbar-width: thin; padding: 4px 8px 8px 0; }
+.bw-bible-hint { margin: 0 0 16px; color: hsl(var(--muted-foreground)); font-size: 11px; line-height: 1.7; }
+.bw-bible-prose { color: hsl(var(--foreground)); font-size: 12px; line-height: 1.95; white-space: pre-wrap; overflow-wrap: anywhere; }
+.bw-bible-empty { padding: 20px 0 28px; }
+.bw-bible-empty h4 { margin: 0 0 8px; font-size: 13px; font-weight: 500; }
+.bw-bible-empty p { margin: 0; color: hsl(var(--muted-foreground)); font-size: 11px; line-height: 1.8; }
+@media (max-width: 490px) {
+  .bw-bible-head > .vp-button { font-size: 10px; }
+  .bw-bible-tab { padding: 8px 10px; }
+  .bw-bible-panel { max-height: 360px; }
+}
+.asset-grid { align-items: start; }
+.asset-card-open { display: block; width: 100%; padding: 0; border: 0; border-radius: inherit; background: transparent; color: inherit; text-align: left; font: inherit; cursor: pointer; }
+.asset-card-open:focus-visible { outline: 2px solid hsl(var(--ring)); outline-offset: -3px; }
+.bw-asset-field { margin: 12px 0; min-width: 0; }
+.bw-asset-field h4 { font-size: 11px; margin: 0 0 6px; }
+.bw-asset-text { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 11px; line-height: 1.85; max-height: 280px; overflow-y: auto; margin: 4px 0 10px; }
+.bw-asset-field .vp-button, .bw-asset-dialog-fields > .vp-button { font-size: 11px; white-space: normal; }
+.bw-legacy-characters { margin: 10px 0 16px; }
+.bw-legacy-dialog-body > .vp-muted { margin: 0; font-size: 11px; line-height: 1.8; }
+.bw-asset-dialog { width: min(860px, calc(100vw - 32px)); max-width: none; max-height: min(820px, calc(100dvh - 32px)); padding: 0; border: 1px solid hsl(var(--border)); border-radius: 12px; background: hsl(var(--card)); color: hsl(var(--foreground)); box-sizing: border-box; overflow: hidden; }
+.bw-asset-dialog[open] { display: flex; flex-direction: column; }
+.bw-asset-dialog::backdrop { background: #0009; }
+.bw-asset-dialog-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 18px 20px; flex: none; }
+.bw-asset-dialog-head h3 { min-width: 0; overflow-wrap: anywhere; margin: 0; font-size: 16px; font-weight: 550; }
+.bw-asset-dialog-head > button { flex: none; }
+.bw-asset-dialog-body { display: grid; grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr); gap: 24px; padding: 0 20px 20px; overflow-y: auto; overscroll-behavior: contain; min-height: 0; }
+.bw-asset-dialog-visual, .bw-asset-dialog-fields { min-width: 0; }
+.bw-asset-dialog-preview { display: grid; place-items: center; aspect-ratio: 1; width: 100%; min-width: 0; background: hsl(var(--stage)); border-radius: 8px; overflow: hidden; font-size: 12px; color: hsl(var(--muted-foreground)); }
+.bw-asset-dialog-preview img { object-fit: contain; }
+.bw-asset-dialog-visual > p { font-size: 11px; margin: 10px 0 0; }
+.bw-asset-dialog-fields .bw-asset-field:first-child { margin-top: 0; }
+.bw-asset-dialog-fields .bw-asset-text { max-height: none; overflow-y: visible; font-size: 12px; }
+.bw-asset-dialog-fields .bw-asset-field { margin-bottom: 22px; }
+@media (max-width: 600px) {
+  .bw-asset-dialog-body { grid-template-columns: minmax(0, 1fr); gap: 20px; padding: 0 16px 16px; }
+  .bw-asset-dialog-head { padding: 16px; }
+  .bw-asset-dialog-visual { width: min(100%, 280px); justify-self: center; }
+}
+.bw-legacy-dialog .bw-legacy-dialog-body { display: block; }
+.bw-legacy-dialog-body .bw-asset-text { max-height: none; overflow-y: visible; font-size: 12px; margin: 16px 0 20px; }

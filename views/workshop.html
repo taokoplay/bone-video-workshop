@@ -1,0 +1,1933 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="pi-plugin-chrome" content="v2" />
+    <!-- bone-build 由 regen-manifest.mjs 从 manifest.version 写入：面板据此判断自己是不是旧文档。 -->
+    <meta name="bone-build" content="0.21.0" />
+    <title>Bone 影视工厂</title>
+    <style>
+      /* Visual-production design tokens (light and dark), mapped from the
+         original prototype palette to the hsl variable names the vp-*
+         component styles consume. */
+      :root {
+        color-scheme: light;
+        --background: 0 0% 100%;
+        --foreground: 0 0% 14%;
+        --card: 0 0% 100%;
+        --border: 0 0% 91%;
+        --muted: 0 0% 96%;
+        --muted-foreground: 0 0% 51%;
+        --accent: 0 0% 93%;
+        --primary: 0 0% 14%;
+        --ring: 137 22% 48%;
+        --stage: 90 6% 94%;
+        --tab-active: 214 66% 50%;
+        --green: 143 26% 38%;
+        --green-bg: 125 26% 94%;
+        --amber: 43 71% 35%;
+        --amber-bg: 45 74% 92%;
+        --shadow: 0 12px 32px #0000000c;
+      }
+      :root[data-theme="dark"] {
+        color-scheme: dark;
+        /* 模块底色取自设计稿灰 #222222；卡片/边框在其上逐级提亮，保证层次可辨 */
+        --background: 0 0% 13.3%;
+        --foreground: 0 0% 93%;
+        --card: 0 0% 17%;
+        --border: 0 0% 24%;
+        --muted: 0 0% 19%;
+        --muted-foreground: 0 0% 66%;
+        --accent: 0 0% 25%;
+        --primary: 0 0% 93%;
+        --stage: 0 0% 10%;
+        --tab-active: 214 66% 62%;
+        --green: 127 24% 74%;
+        --green-bg: 147 16% 21%;
+        --amber: 43 67% 68%;
+        --amber-bg: 43 38% 20%;
+        --shadow: 0 12px 32px #0005;
+      }
+      * { box-sizing: border-box; }
+      html, body { height: 100%; margin: 0; }
+      body {
+        background: hsl(var(--background));
+        color: hsl(var(--foreground));
+        font: 13px/1.55 -apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC", "Microsoft YaHei", sans-serif;
+        padding-top: var(--pi-plugin-titlebar-height, 0px);
+        overflow: hidden;
+      }
+      button { font: inherit; color: inherit; border: 0; background: none; cursor: pointer; }
+      button:disabled { cursor: not-allowed; opacity: 0.45; }
+      button:focus-visible { outline: 2px solid hsl(var(--ring)); outline-offset: 2px; }
+      h1, h2, h3, h4, p { margin: 0; }
+      svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; flex-shrink: 0; }
+      [hidden] { display: none !important; }
+
+      /* ---------- shipped vp-* component styles (subset, read-only) ---------- */
+      .vp-workspace { height: calc(100dvh - var(--pi-plugin-titlebar-height, 0px)); min-height: 0; display: flex; flex-direction: column; position: relative; background: hsl(var(--background)); overflow: hidden; }
+      .vp-top, .vp-tabs { display: flex; align-items: center; gap: 8px; padding: 10px 14px; border-bottom: 1px solid hsl(var(--border)); }
+      .vp-top { flex-shrink: 0; }
+      .vp-top-heading { display: flex; flex: 1; flex-direction: column; gap: 3px; min-width: 0; }
+      .vp-brand-row { display: flex; align-items: center; gap: 8px; }
+      .vp-top strong { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      .vp-top .vp-brand { color: hsl(var(--muted-foreground)); font-weight: 500; }
+      .vp-top .vp-brand em { font-style: normal; color: hsl(var(--foreground)); }
+      .vp-tabs { overflow: auto; padding-block: 6px; flex-shrink: 0; gap: 14px; scrollbar-width: none; }
+      .vp-tabs::-webkit-scrollbar { display: none; }
+      .vp-tabs button { white-space: nowrap; height: 32px; padding-inline: 2px; font-size: 12px; color: hsl(var(--muted-foreground)); }
+      .vp-tabs button[aria-current="page"] { border-bottom: 2px solid hsl(var(--primary)); border-radius: 0; color: hsl(var(--foreground)); background: transparent; font-weight: 500; }
+      .vp-body { overflow: auto; flex: 1; min-height: 0; padding: 16px; scrollbar-width: thin; }
+      .vp-section { display: grid; gap: 14px; }
+      .vp-card { padding: 16px; border: 1px solid hsl(var(--border)); border-radius: 12px; background: hsl(var(--card)); }
+      .vp-card h3 { font-weight: 600; margin-bottom: 8px; }
+      .vp-muted { color: hsl(var(--muted-foreground)); font-size: 12px; }
+      .vp-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+      .vp-row > strong { flex: 1; }
+       .vp-badge { padding: 3px 7px; border-radius: 5px; background: hsl(var(--muted)); font-size: 11px; }
+       .vp-badge.ready { background: hsl(var(--green-bg)); color: hsl(var(--green)); }
+       .vp-badge.review { background: hsl(var(--amber-bg)); color: hsl(var(--amber)); }
+       .vp-stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(84px, 1fr)); gap: 10px; margin-top: 10px; }
+       .vp-stat { display: grid; gap: 2px; padding: 10px 12px; border: 1px solid hsl(var(--border)); border-radius: 8px; background: hsl(var(--muted) / 0.35); }
+       .vp-error { padding: 10px 14px; color: hsl(0 55% 48%); background: hsl(var(--muted)); display: flex; gap: 8px; align-items: center; }
+       .vp-info { padding: 8px 14px; background: hsl(var(--green-bg)); color: hsl(var(--green)); font-size: 11px; display: flex; gap: 8px; align-items: center; }
+       .vp-info-error { background: hsl(var(--amber-bg)); color: hsl(var(--amber)); }
+       .vp-stat strong { font-size: 18px; font-weight: 600; font-variant-numeric: tabular-nums; line-height: 1.2; }
+       .vp-stat span { color: hsl(var(--muted-foreground)); font-size: 10px; }
+       .vp-line { display: flex; align-items: center; gap: 8px; width: 100%; min-height: 34px; padding: 6px 0; border-bottom: 1px solid hsl(var(--border)); font-size: 12px; text-align: left; }
+       .vp-line:last-child { border-bottom: 0; }
+       .vp-line-button:hover { background: hsl(var(--accent) / 0.4); }
+       .vp-line-index { flex: none; min-width: 22px; font: 11px ui-monospace, monospace; color: hsl(var(--muted-foreground)); font-variant-numeric: tabular-nums; }
+       .vp-line-index-quiet { color: hsl(var(--amber)); }
+       .vp-line-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+       .vp-code { font: 11px ui-monospace, monospace; padding: 2px 6px; border-radius: 4px; background: hsl(var(--muted)); color: hsl(var(--foreground)); }
+       .vp-prompt { margin-top: 10px; padding: 10px 12px; border: 1px solid hsl(var(--border)); border-radius: 8px; background: hsl(var(--muted) / 0.35); color: hsl(var(--muted-foreground)); font: 11px/1.75 ui-monospace, monospace; white-space: pre-wrap; overflow-wrap: anywhere; }
+       .vp-dialog { width: min(560px, calc(100vw - 32px)); max-height: calc(100dvh - 48px); padding: 0; border: 1px solid hsl(var(--border)); border-radius: 12px; background: hsl(var(--card)); color: hsl(var(--foreground)); box-shadow: var(--shadow); }
+       .vp-dialog::backdrop { background: #0005; }
+       .vp-dialog form { display: flex; flex-direction: column; min-height: 0; max-height: inherit; }
+       .vp-dialog-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding: 16px 18px 12px; border-bottom: 1px solid hsl(var(--border)); }
+       .vp-dialog-head strong { display: block; font-size: 14px; font-weight: 600; }
+       .vp-dialog-head small { display: block; margin-top: 4px; color: hsl(var(--muted-foreground)); font-size: 11px; line-height: 1.6; }
+       .vp-dialog-body { display: grid; gap: 12px; padding: 16px 18px; overflow: auto; min-height: 0; }
+       .vp-field { display: grid; gap: 5px; min-width: 0; }
+       .vp-field > span { font-size: 11px; color: hsl(var(--muted-foreground)); }
+       .vp-field > span em { font-style: normal; color: hsl(var(--amber)); margin-left: 2px; }
+       .vp-dialog-small { width: min(420px, calc(100vw - 32px)); }
+       /* 自定义下拉：避免系统原生菜单与深色皮肤冲突 */
+       .vp-select { position: relative; }
+       .vp-select-trigger { display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; min-width: 0; height: 32px; padding: 7px 9px; border: 1px solid hsl(var(--border)); border-radius: 6px; background: hsl(var(--background)); color: hsl(var(--foreground)); font: inherit; font-size: 12px; text-align: left; }
+       .vp-select-trigger:hover { border-color: hsl(var(--muted-foreground) / 0.6); }
+       .vp-select-trigger[aria-expanded="true"] { border-color: hsl(var(--ring)); }
+       .vp-select-trigger svg { flex: none; color: hsl(var(--muted-foreground)); transition: transform 120ms ease; }
+       .vp-select-trigger[aria-expanded="true"] svg { transform: rotate(180deg); }
+       .vp-select-value { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+       .vp-select-menu { position: absolute; z-index: 30; top: calc(100% + 4px); left: 0; right: 0; margin: 0; padding: 4px; list-style: none; border: 1px solid hsl(var(--border)); border-radius: 8px; background: hsl(var(--card)); box-shadow: var(--shadow); max-height: 220px; overflow: auto; }
+       .vp-select-menu li { padding: 7px 9px; border-radius: 5px; font-size: 12px; cursor: pointer; }
+       .vp-select-menu li:hover { background: hsl(var(--accent)); }
+       .vp-select-menu li[aria-selected="true"] { background: hsl(var(--accent)); color: hsl(var(--foreground)); font-weight: 550; }
+       .vp-select-menu li[aria-selected="true"]::after { content: "✓"; float: right; color: hsl(var(--green)); }
+       .vp-button-danger { border-color: hsl(0 55% 48% / 0.55); background: hsl(0 55% 48%); color: #fff; }
+       .vp-button-danger:hover { background: hsl(0 60% 42%); }
+       .vp-button-danger:disabled { opacity: 0.5; }
+       .vp-field input, .vp-field select, .vp-field textarea { width: 100%; min-width: 0; padding: 7px 9px; border: 1px solid hsl(var(--border)); border-radius: 6px; background: hsl(var(--background)); color: hsl(var(--foreground)); font: inherit; font-size: 12px; }
+       .vp-field input, .vp-field select { height: 32px; }
+       .vp-field textarea { resize: vertical; min-height: 64px; line-height: 1.6; }
+       .vp-field input:focus-visible, .vp-field select:focus-visible, .vp-field textarea:focus-visible { outline: 2px solid hsl(var(--ring)); outline-offset: 1px; }
+       .vp-field-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+       .vp-dialog-foot { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 18px; border-top: 1px solid hsl(var(--border)); background: hsl(var(--muted) / 0.25); }
+       .vp-dialog-foot .vp-muted { font-size: 10px; }
+       .vp-dialog-error { margin: 0; padding: 8px 10px; border-radius: 6px; background: hsl(var(--amber-bg)); color: hsl(var(--amber)); font-size: 11px; }
+       @media (max-width: 480px) { .vp-field-pair { grid-template-columns: 1fr; } }
+       .vp-card > .vp-button { margin-top: 10px; }
+      .vp-media { background: hsl(var(--muted)); border-radius: 8px; overflow: hidden; display: flex; align-items: center; justify-content: center; color: hsl(var(--muted-foreground)); min-height: 80px; }
+      .vp-media img, .vp-media video { width: 100%; height: 100%; object-fit: contain; }
+      .vp-button { display: inline-flex; align-items: center; gap: 5px; height: 28px; padding: 0 9px; border: 1px solid hsl(var(--border)); border-radius: 6px; background: hsl(var(--card)); font-size: 11px; white-space: nowrap; }
+      .vp-button:hover { background: hsl(var(--muted)); }
+      .vp-button.primary { border-color: hsl(var(--primary)); background: hsl(var(--primary)); color: hsl(var(--background)); }
+      .vp-error { padding: 10px 14px; color: hsl(0 55% 48%); background: hsl(var(--muted)); display: flex; gap: 8px; align-items: center; }
+      .vp-empty { padding: 48px 20px; text-align: center; display: grid; justify-items: center; gap: 12px; }
+      .vp-empty .vp-media { width: 45px; height: 45px; min-height: 45px; border-radius: 12px; }
+      .vp-empty strong { font-size: 13px; font-weight: 600; }
+      .vp-empty p { color: hsl(var(--muted-foreground)); font-size: 11px; line-height: 1.8; max-width: 300px; }
+      .vp-empty code { font: 11px ui-monospace, monospace; background: hsl(var(--muted)); padding: 1px 5px; border-radius: 4px; }
+
+      /* production directory overlay (original .vp-directory pattern) */
+      .vp-directory { position: absolute; inset: calc(var(--pi-plugin-titlebar-height, 0px) + 49px) auto 0 0; width: min(300px, 90%); z-index: 20; background: hsl(var(--background)); border-right: 1px solid hsl(var(--border)); box-shadow: 10px 0 25px #0002; padding: 12px; display: flex; flex-direction: column; gap: 10px; overflow: auto; scrollbar-width: thin; }
+      .vp-directory header { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+      .vp-directory header strong { font-size: 12px; font-weight: 550; }
+       .vp-directory-item { display: flex; align-items: center; gap: 4px; width: 100%; min-height: 48px; padding: 4px; border-radius: 8px; }
+       .vp-directory-item:hover { background: hsl(var(--muted)); }
+       .vp-directory-item.active { background: hsl(var(--accent)); }
+       .vp-directory-main { display: flex; align-items: center; gap: 9px; flex: 1; min-width: 0; padding: 3px 2px; text-align: left; }
+       .vp-directory-actions { display: flex; align-items: center; gap: 2px; flex: none; opacity: 0.75; transition: opacity 120ms ease; }
+       .vp-directory-item .dir-thumb { width: 40px; height: 26px; flex-shrink: 0; border-radius: 4px; background: hsl(var(--stage)); display: grid; place-items: center; font-size: 12px; }
+       .vp-directory-main > span { flex: 1; min-width: 0; }
+       .vp-directory-item strong { display: block; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: 11px; font-weight: 500; }
+       .vp-directory-item small { display: block; margin-top: 2px; color: hsl(var(--muted-foreground)); font-size: 9px; }
+       .vp-directory-item:hover .vp-directory-actions, .vp-directory-item:focus-within .vp-directory-actions { opacity: 1; }
+       .vp-item-action { display: grid; place-items: center; width: 26px; height: 26px; border-radius: 6px; color: hsl(var(--muted-foreground)); }
+       .vp-item-action:hover { background: hsl(var(--accent)); color: hsl(var(--foreground)); }
+       .vp-item-action.danger:hover { background: hsl(0 55% 48% / 0.16); color: hsl(0 60% 55%); }
+      .vp-overlay { position: absolute; inset: calc(var(--pi-plugin-titlebar-height, 0px) + 49px) 0 0; z-index: 19; background: #0002; }
+
+      /* 项目 tab */
+       .vp-directory-create { width: 100%; justify-content: center; height: 30px; }
+       .vp-directory-empty { margin: 4px 2px 0; color: hsl(var(--muted-foreground)); font-size: 11px; line-height: 1.7; }
+      /* 项目 tab：作品简介卡 + 集数卡，字段顺序沿用原版（标题、徽章、简介、声音、核对时间）。 */
+      .vp-project-title { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 12px; }
+       .vp-row-actions { display: flex; align-items: center; gap: 6px; flex: none; margin-left: auto; }
+       .vp-row-actions .vp-button { height: 26px; font-size: 11px; }
+       .vp-card-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+      .vp-project-title h2 { font-size: 17px; font-weight: 650; letter-spacing: -0.2px; line-height: 1.35; overflow-wrap: anywhere; }
+      .project-tags { display: flex; gap: 6px; flex-wrap: wrap; }
+      .project-tags b { padding: 3px 6px; border-radius: 4px; background: hsl(var(--muted)); color: hsl(var(--muted-foreground)); font-size: 10px; font-weight: 500; white-space: nowrap; }
+      .vp-summary { margin-top: 10px; font-size: 12px; line-height: 1.9; white-space: pre-wrap; overflow-wrap: anywhere; }
+      .vp-project-sound { margin-top: 8px; color: hsl(var(--muted-foreground)); font-size: 11px; }
+      .vp-project-meta { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 14px; padding-top: 12px; border-top: 1px solid hsl(var(--border)); color: hsl(var(--muted-foreground)); font-size: 10px; font-variant-numeric: tabular-nums; }
+      .vp-project-meta-spacer { flex: 1; min-width: 8px; }
+      .vp-project-meta .vp-button { height: 24px; font-size: 10px; padding-inline: 7px; }
+      .vp-card-note { margin-top: 10px; line-height: 1.8; }
+      .vp-ep-row { display: flex; align-items: center; gap: 9px; width: 100%; min-height: 44px; margin-top: 8px; padding: 7px 9px; border: 1px solid hsl(var(--border)); border-radius: 8px; background: hsl(var(--background)); text-align: left; }
+      .vp-ep-row:hover { border-color: hsl(var(--muted-foreground) / 0.55); background: hsl(var(--accent) / 0.35); }
+      .vp-ep-index { flex: none; width: 24px; font: 11px ui-monospace, monospace; color: hsl(var(--muted-foreground)); font-variant-numeric: tabular-nums; }
+      .vp-ep-main { flex: 1; min-width: 0; display: grid; gap: 2px; }
+      .vp-ep-main strong { font-size: 12px; font-weight: 550; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      .vp-ep-main small { color: hsl(var(--muted-foreground)); font-size: 10px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      .vp-ep-count { flex: none; color: hsl(var(--muted-foreground)); font-size: 10px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+      /* 集数行：左标题 / 右剧本（项目页内嵌剧本概览） */
+      .vp-ep-block { display: grid; grid-template-columns: 196px minmax(0, 1fr); gap: 16px; align-items: start; padding: 12px 0; border-top: 1px solid hsl(var(--border)); }
+      .vp-ep-block:first-of-type { border-top: 0; padding-top: 4px; }
+      .vp-ep-side { display: grid; gap: 5px; justify-items: start; text-align: left; min-width: 0; padding: 2px 0; }
+      .vp-ep-side:hover strong { color: hsl(var(--tab-active)); }
+      .vp-ep-side-top { display: flex; align-items: baseline; gap: 7px; min-width: 0; }
+      .vp-ep-side-top strong { font-size: 12.5px; font-weight: 550; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      .vp-ep-side-meta { display: flex; gap: 8px; color: hsl(var(--muted-foreground)); font-size: 10px; font-variant-numeric: tabular-nums; }
+      .vp-ep-script { display: grid; gap: 6px; min-width: 0; align-content: start; }
+      .vp-ep-logline { font-size: 11.5px; line-height: 1.75; color: hsl(var(--foreground)); overflow-wrap: anywhere; }
+      .vp-ep-beatline { display: flex; align-items: baseline; gap: 8px; min-width: 0; font-size: 11px; }
+      .vp-ep-beat-purpose { flex: none; padding: 1px 6px; border-radius: 4px; background: hsl(var(--muted)); color: hsl(var(--muted-foreground)); font-size: 9.5px; }
+      .vp-ep-beat-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      .vp-ep-beat-meta { margin-left: auto; flex: none; color: hsl(var(--muted-foreground)); font-size: 10px; white-space: nowrap; }
+      .vp-ep-empty { color: hsl(var(--muted-foreground)); font-size: 10.5px; line-height: 1.7; }
+      @media (max-width: 560px) { .vp-ep-block { grid-template-columns: minmax(0, 1fr); gap: 8px; } }
+      /* 项目页的集数与剧本：左菜单 + 右侧长文阅读区 */
+      .vp-card-flush { padding: 16px 0 8px; }
+      .vp-ep-head { padding: 0 16px 10px; }
+      .vp-ep-split { display: grid; grid-template-columns: 208px minmax(0, 1fr); align-items: stretch; gap: 14px; padding: 2px 16px 16px; }
+      /* 左菜单自成一张圆角卡片，不用分割线区分左右 */
+      .vp-ep-menu { display: flex; flex-direction: column; gap: 3px; align-self: stretch; padding: 8px; border: 1px solid hsl(var(--border)); border-radius: 10px; background: hsl(var(--stage)); overflow: auto; scrollbar-width: thin; }
+      .vp-ep-menu-item { display: flex; align-items: baseline; gap: 7px; width: 100%; padding: 7px 8px; border: 1px solid transparent; border-radius: 7px; text-align: left; }
+      .vp-ep-menu-item:hover { background: hsl(var(--accent) / 0.55); }
+      .vp-ep-menu-item.active { background: hsl(var(--card)); }
+      .vp-ep-menu-top { display: flex; align-items: baseline; gap: 6px; min-width: 0; }
+      .vp-ep-menu-top strong { font-size: 11.5px; font-weight: 550; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      .vp-ep-menu-meta { display: flex; gap: 8px; padding-left: 23px; color: hsl(var(--muted-foreground)); font-size: 9.5px; font-variant-numeric: tabular-nums; }
+      .vp-ep-reader { min-width: 0; padding: 12px 18px 20px; }
+      .vp-ep-reader-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding-bottom: 12px; border-bottom: 1px solid hsl(var(--border)); }
+      .vp-ep-reader-copy { min-width: 0; }
+      .vp-ep-reader-copy h4 { font-size: 15px; font-weight: 600; overflow-wrap: anywhere; }
+      .vp-ep-reader-meta { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 5px; color: hsl(var(--muted-foreground)); font-size: 10px; font-variant-numeric: tabular-nums; }
+      .vp-ep-reader-section { padding: 14px 0; border-bottom: 1px solid hsl(var(--border)); }
+      .vp-ep-reader-label { display: block; color: hsl(var(--muted-foreground)); font-size: 10px; }
+      .vp-ep-reader-text { margin-top: 6px; max-width: 76ch; font-size: 12px; line-height: 1.9; white-space: pre-wrap; overflow-wrap: anywhere; }
+      .vp-ep-reader-lead { font-size: 13px; line-height: 1.85; }
+      .vp-ep-beat-block { padding: 16px 0; border-bottom: 1px solid hsl(var(--border)); }
+      .vp-ep-beat-block:last-child { border-bottom: 0; }
+      .vp-ep-beat-head { display: flex; align-items: center; gap: 8px; }
+      .vp-ep-beat-index { font: 10px ui-monospace, monospace; color: hsl(var(--muted-foreground)); }
+      .vp-ep-beat-shots { margin-left: auto; color: hsl(var(--muted-foreground)); font-size: 10px; white-space: nowrap; }
+      .vp-ep-beat-block h5 { margin: 7px 0 0; font-size: 14px; font-weight: 550; line-height: 1.5; overflow-wrap: anywhere; }
+      .vp-ep-beat-field { margin-top: 10px; }
+      .vp-ep-beat-field > span { display: block; color: hsl(var(--muted-foreground)); font-size: 10px; }
+      .vp-ep-beat-field > p { margin-top: 4px; max-width: 76ch; font-size: 11.5px; line-height: 1.85; white-space: pre-wrap; overflow-wrap: anywhere; }
+      @media (max-width: 620px) {
+        .vp-ep-split { grid-template-columns: minmax(0, 1fr); }
+        .vp-ep-split { gap: 10px; padding: 10px 12px 14px; }
+        .vp-ep-menu { flex-direction: row; align-self: start; overflow-x: auto; }
+        .vp-ep-menu-item { flex: 0 0 160px; }
+        .vp-ep-reader { max-height: none; padding: 12px 14px 18px; }
+      }
+      /* 剧本正文：文章式排版，供长文阅读 */
+      .vp-ep-prose-lead { margin-top: 14px; padding-left: 10px; border-left: 2px solid hsl(var(--tab-active)); color: hsl(var(--muted-foreground)); font-size: 12px; line-height: 1.85; }
+      .vp-ep-prose { margin-top: 14px; max-width: 72ch; }
+      .vp-ep-prose p { font-size: 12.5px; line-height: 2; text-indent: 2em; margin-bottom: 0.9em; overflow-wrap: anywhere; }
+      .vp-ep-prose p:last-child { margin-bottom: 0; }
+      /* 剧本页撑满可视高度：菜单到底，正文内部滚动 */
+      .vp-body.vp-body-fill { display: flex; flex-direction: column; overflow: hidden; padding: 12px 16px 16px; }
+      .vp-body-fill .vp-ep-split { flex: 1; min-height: 0; padding: 0; gap: 14px; }
+      .vp-body-fill .vp-ep-menu { max-height: none; min-height: 0; overflow: auto; }
+      .vp-body-fill .vp-ep-reader { min-height: 0; overflow: auto; padding: 0 6px 0 0; }
+      .vp-body-fill .vp-ep-reader-head { padding-top: 2px; }
+      /* 资产 tab (asset-library grid) */
+      .asset-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(148px, 1fr)); gap: 10px; margin-top: 8px; }
+      .asset-card { display: flex; flex-direction: column; min-width: 0; width: 100%; overflow: hidden; padding: 0; border: 1px solid hsl(var(--border)); border-radius: 8px; background: hsl(var(--card)); text-align: left; }
+      .asset-card:hover { border-color: hsl(var(--muted-foreground)); }
+      .asset-tools { margin-top: 10px; }
+      .asset-search { display: flex; align-items: center; gap: 7px; padding: 7px 9px; border: 1px solid hsl(var(--border)); border-radius: 6px; background: hsl(var(--background)); color: hsl(var(--muted-foreground)); font-size: 11px; }
+      .asset-search input { flex: 1; min-width: 0; border: 0; padding: 0; background: transparent; color: hsl(var(--foreground)); font: inherit; font-size: 11px; outline: 0; }
+      .asset-search:focus-within { border-color: hsl(var(--ring)); }
+      .asset-type-filters { display: flex; flex-wrap: wrap; gap: 3px; margin: 10px 0 4px; }
+      .asset-type-filter { display: inline-flex; align-items: center; gap: 5px; min-height: 26px; padding: 4px 8px; border-radius: 5px; color: hsl(var(--muted-foreground)); font-size: 10.5px; }
+      .asset-type-filter:hover { background: hsl(var(--muted)); color: hsl(var(--foreground)); }
+      .asset-type-filter[aria-pressed="true"] { background: hsl(var(--accent)); color: hsl(var(--foreground)); font-weight: 550; }
+      .asset-type-filter span { color: hsl(var(--muted-foreground)); font-size: 9.5px; font-variant-numeric: tabular-nums; }
+      .asset-card { display: flex; flex-direction: column; gap: 0; padding: 0; overflow: hidden; }
+      /* 资产多为正方形素材，预览用 1:1 */
+      .asset-card-preview { display: flex; align-items: center; justify-content: center; width: 100%; aspect-ratio: 1 / 1; height: auto; flex: none; border-radius: 0; background: hsl(var(--stage)); color: hsl(var(--muted-foreground)); font-size: 22px; overflow: hidden; }
+      .asset-card-preview img { width: 100%; height: 100%; object-fit: cover; display: block; }
+      .asset-card-preview img { width: 100%; height: 100%; object-fit: cover; }
+      .asset-card-info { display: grid; gap: 4px; min-width: 0; padding: 9px 10px 10px; }
+      .asset-card-info > strong { display: block; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: 11px; font-weight: 550; }
+      .asset-card-meta { display: flex; align-items: center; justify-content: space-between; gap: 4px; margin-top: 5px; color: hsl(var(--muted-foreground)); font-size: 9px; }
+      .asset-lock { flex-shrink: 0; display: inline-flex; align-items: center; gap: 3px; }
+
+      /* 脚本 tab */
+      .vp-script-thesis { border: 1px solid hsl(var(--border)); border-radius: 8px; background: hsl(var(--card)); overflow: hidden; }
+      .vp-script-thesis-toggle { display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; min-height: 48px; padding: 10px 13px; text-align: left; }
+      .vp-script-thesis-toggle:hover { background: hsl(var(--accent) / 0.35); }
+      .vp-script-thesis-toggle strong { font-size: 12px; font-weight: 600; }
+      .vp-script-thesis-toggle > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      .vp-script-thesis-body { display: grid; gap: 12px; padding: 14px 16px 16px; border-top: 1px solid hsl(var(--border)); }
+      .vp-script-field > span { display: block; font-size: 10px; color: hsl(var(--muted-foreground)); }
+      .vp-script-field > p { margin-top: 5px; font-size: 11px; line-height: 1.8; color: hsl(var(--foreground)); white-space: pre-wrap; overflow-wrap: anywhere; }
+
+
+
+      /* 脚本页：screenplay 布局——工具条 + 左索引 + 右正文 */
+      .vp-script-page { display: flex; flex: 1; flex-direction: column; gap: 0; min-width: 0; min-height: 0; }
+      .vp-script-bar { display: grid; flex-shrink: 0; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 10px 12px; padding: 0 0 10px; }
+      .vp-script-bar > .vp-script-kicker { grid-row: 1; grid-column: 1; }
+      .vp-script-bar > .vp-chiprow { grid-row: 1; grid-column: 2 / -1; }
+      .vp-script-bar > .vp-script-stats { grid-row: 2; grid-column: 1 / 3; min-width: 0; flex-wrap: wrap; }
+      .vp-script-kicker { color: hsl(var(--muted-foreground)); font: 500 9px/1.3 ui-monospace, monospace; letter-spacing: 0.12em; }
+      .vp-chiprow { display: flex; align-items: center; gap: 4px; min-width: 0; overflow-x: auto; scrollbar-width: none; padding-bottom: 2px; }
+      .vp-chiprow::-webkit-scrollbar { display: none; }
+      .vp-chip { padding: 5px 10px; border-radius: 6px; color: hsl(var(--muted-foreground)); font-size: 11px; white-space: nowrap; }
+      .vp-chip:hover { background: hsl(var(--muted)); color: hsl(var(--foreground)); }
+      .vp-chip.active { background: hsl(var(--accent)); color: hsl(var(--foreground)); font-weight: 550; }
+      .vp-script-stats { display: flex; align-items: center; gap: 10px; color: hsl(var(--muted-foreground)); font-size: 10px; white-space: nowrap; }
+      .vp-script-stats > span + span { padding-left: 10px; border-left: 1px solid hsl(var(--border)); }
+      .vp-script-bar .vp-row-actions { grid-row: 2; grid-column: 3; justify-self: end; margin-left: 0; }
+
+      .vp-script-layout { display: grid; flex: 1; grid-template-columns: 208px minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); align-items: stretch; gap: 10px; min-width: 0; min-height: 0; }
+      /* 左栏与剧本页同款：自带圆角卡片的侧栏，不用分割线 */
+      .vp-script-aside { display: flex; flex-direction: column; gap: 3px; align-self: stretch; padding: 8px; border: 1px solid hsl(var(--border)); border-radius: 10px; background: hsl(var(--stage)); min-height: 0; overflow: auto; scrollbar-width: thin; }
+      .vp-script-aside-head { display: flex; align-items: center; justify-content: space-between; gap: 6px; padding: 0 6px 8px; }
+      .vp-script-aside-title { color: hsl(var(--muted-foreground)); font-size: 10px; letter-spacing: 0.1em; }
+      .vp-script-aside-count { color: hsl(var(--muted-foreground)); font: 10px ui-monospace, monospace; }
+      .vp-script-aside-empty { padding: 6px 5px; color: hsl(var(--muted-foreground)); font-size: 10px; line-height: 1.6; }
+      /* 节拍索引与剧本页的集数菜单共用同一套卡片样式 */
+      .vp-beat { display: flex; flex-shrink: 0; align-items: baseline; gap: 7px; width: 100%; padding: 7px 8px; border: 1px solid transparent; border-radius: 7px; text-align: left; }
+      .vp-beat:hover { background: hsl(var(--accent) / 0.55); }
+      .vp-beat.active { background: hsl(var(--card)); }
+      .vp-beat-index { flex: none; width: 24px; padding-top: 0; font: 11px ui-monospace, monospace; color: hsl(var(--muted-foreground)); font-variant-numeric: tabular-nums; }
+
+      .vp-beat-copy { display: grid; gap: 2px; min-width: 0; }
+      .vp-beat-copy strong { font-size: 11.5px; font-weight: 550; line-height: 1.45; overflow-wrap: anywhere; }
+      .vp-beat-copy small { color: hsl(var(--muted-foreground)); font-size: 9.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      .vp-beat-thesis { margin-top: 6px; border-top: 1px solid hsl(var(--border)); border-radius: 0 0 7px 7px; }
+
+      .vp-script-main { min-width: 0; min-height: 0; overflow: auto; padding: 0 0 20px; scrollbar-width: thin; }
+      .vp-script-arc { border: 1px solid hsl(var(--border)); border-radius: 8px; background: hsl(var(--card)); overflow: hidden; }
+      .vp-script-arc-head { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 44px; padding: 10px 13px; text-align: left; }
+      .vp-script-arc-head:hover { background: hsl(var(--accent) / 0.35); }
+      .vp-script-arc-head strong { font-size: 11px; font-weight: 550; white-space: nowrap; }
+      .vp-script-arc-chain { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: hsl(var(--muted-foreground)); font-size: 10px; }
+      .vp-script-arc-toggle { flex: none; color: hsl(var(--muted-foreground)); font-size: 10px; }
+      .vp-script-arc-body { display: grid; gap: 12px; padding: 4px 16px 16px; border-top: 1px solid hsl(var(--border)); }
+      .vp-script-arc-field > span { display: block; margin-top: 10px; color: hsl(var(--muted-foreground)); font-size: 10px; }
+      .vp-script-arc-field > p { margin-top: 4px; font-size: 11px; line-height: 1.8; white-space: pre-wrap; overflow-wrap: anywhere; }
+
+      .vp-script-beat-detail { min-width: 0; padding-top: 20px; }
+      .vp-script-beat-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+      .vp-script-beat-kicker { color: hsl(var(--muted-foreground)); font: 500 9px/1.3 ui-monospace, monospace; letter-spacing: 0.12em; }
+      .vp-script-beat-detail h2 { margin: 6px 0 0; font-size: clamp(20px, 2vw, 27px); font-weight: 450; letter-spacing: -0.02em; line-height: 1.35; }
+      .vp-script-beat-text { max-width: 74ch; margin-top: 14px; font-size: 12px; line-height: 1.9; white-space: pre-wrap; overflow-wrap: anywhere; }
+      .vp-script-mapped { margin-top: 26px; padding-top: 14px; border-top: 1px solid hsl(var(--border)); }
+      .vp-script-mapped .vp-row { margin-bottom: 8px; }
+      .vp-script-mapped strong { font-size: 12px; font-weight: 550; }
+      .vp-script-shot-row { display: flex; align-items: center; gap: 10px; width: 100%; padding: 10px 11px; margin-top: 6px; border: 1px solid hsl(var(--border)); border-radius: 8px; background: hsl(var(--card)); text-align: left; }
+      .vp-script-shot-row:hover { border-color: hsl(var(--muted-foreground) / 0.55); background: hsl(var(--accent) / 0.35); }
+      .vp-script-shot-index { flex: none; width: 26px; font: 10px ui-monospace, monospace; color: hsl(var(--tab-active)); }
+      .vp-script-shot-copy { display: grid; gap: 2px; flex: 1; min-width: 0; }
+      .vp-script-shot-copy strong { font-size: 12px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      .vp-script-shot-copy small { color: hsl(var(--muted-foreground)); font-size: 10px; }
+      .vp-script-shot-arrow { flex: none; color: hsl(var(--muted-foreground)); }
+
+      /* 窄工作面板：索引变成横向条，标题让位给节拍卡 */
+      @media (max-width: 760px) {
+        .vp-script-layout { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); }
+        .vp-script-aside { position: static; flex-direction: row; align-items: stretch; max-height: none; overflow-x: auto; overflow-y: hidden; padding: 8px; gap: 3px; scrollbar-width: thin; }
+        .vp-script-aside-head { display: none; }
+        .vp-script-aside-empty { flex: 0 0 auto; white-space: nowrap; }
+        .vp-beat { flex: 0 0 172px; min-width: 0; padding: 7px 8px; }
+        .vp-beat-thesis { margin-top: 0; border-top: 0; border-radius: 7px; flex-basis: 150px; }
+        .vp-script-bar { gap: 8px; padding: 0 0 10px; }
+        .vp-script-kicker { display: none; }
+        .vp-script-bar > .vp-chiprow { grid-column: 1 / -1; }
+        .vp-script-main { padding: 0 0 20px; }
+        .vp-script-stats { gap: 6px; }
+      }
+
+
+      .vp-beat-purpose { color: hsl(var(--muted-foreground)); font-size: 9.5px; letter-spacing: 0.04em; }
+      .vp-beat-meta { color: hsl(var(--muted-foreground)); font-size: 9.5px; font-variant-numeric: tabular-nums; }
+      .vp-script-beat-count { color: hsl(var(--muted-foreground)); font-size: 10px; white-space: nowrap; }
+      .vp-script-beat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr)); gap: 0 20px; margin-top: 16px; }
+      .vp-script-beat-field { min-width: 0; padding: 13px 0; border-top: 1px solid hsl(var(--border)); }
+      .vp-script-beat-field > span { display: block; color: hsl(var(--muted-foreground)); font-size: 10px; }
+      .vp-script-beat-field > p { margin-top: 6px; font-size: 11px; line-height: 1.85; white-space: pre-wrap; overflow-wrap: anywhere; }
+      .vp-script-unmapped { margin-top: 22px; padding-top: 14px; border-top: 1px dashed hsl(var(--border)); }
+      .vp-script-unmapped > span { display: block; margin-bottom: 8px; color: hsl(var(--amber)); font-size: 10px; }
+
+      .vp-script-unmapped-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin-bottom: 8px; }
+      .vp-script-unmapped-head > span { color: hsl(var(--amber)); font-size: 10px; }
+      .vp-script-unmapped-head .vp-button { height: 24px; font-size: 10px; padding-inline: 8px; }
+
+      /* 能力横幅：宿主没授予工具权限时，面板顶部必须说清楚怎么修 */
+      .vp-version { flex: none; padding: 2px 6px; border: 1px solid hsl(var(--border)); border-radius: 5px; color: hsl(var(--muted-foreground)); font: 10px ui-monospace, monospace; }
+      .vp-banner { display: flex; align-items: flex-start; gap: 10px; margin: 8px 16px 0; padding: 10px 12px; border: 1px solid hsl(0 55% 48% / 0.45); border-radius: 8px; background: hsl(0 55% 48% / 0.1); color: hsl(var(--foreground)); font-size: 11px; line-height: 1.7; }
+      .vp-banner > div { min-width: 0; }
+      .vp-banner strong { display: block; color: hsl(0 60% 62%); font-size: 12px; font-weight: 600; }
+      .vp-banner p { margin-top: 4px; color: hsl(var(--muted-foreground)); overflow-wrap: anywhere; }
+      .vp-banner code { padding: 1px 5px; border-radius: 4px; background: hsl(var(--muted)); font: 10px ui-monospace, monospace; }
+      .vp-banner .vp-button { margin-top: 8px; height: 24px; font-size: 10px; }
+
+      /* 制作配置 tab */
+      .vp-record { min-width: 0; border: 1px solid hsl(var(--border)); border-radius: 10px; padding: 14px; display: grid; gap: 8px; background: hsl(var(--card)); }
+      .vp-record-heading { display: flex; align-items: flex-start; gap: 8px; flex-wrap: wrap; min-width: 0; }
+      .vp-record-heading > h3 { flex: 1; min-width: 120px; font-size: 13px; font-weight: 500; }
+      .vp-record-meta { display: flex; gap: 12px; justify-content: space-between; color: hsl(var(--muted-foreground)); font-size: 11px; min-width: 0; }
+      .vp-config-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(180px, 100%), 1fr)); gap: 12px; }
+      .vp-config-grid .vp-card { padding: 12px; display: grid; gap: 5px; }
+      .vp-config-grid .vp-card strong { font-size: 11px; }
+      .vp-config-grid .vp-card span { color: hsl(var(--muted-foreground)); font-size: 10px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+    </style>
+    <link rel="stylesheet" href="./storyboard.css" />
+    <link rel="stylesheet" href="./project-bible.css" />
+    <link rel="stylesheet" href="./editorial.css" />
+    <link rel="stylesheet" href="./revisions.css" />
+  </head>
+  <body>
+    <div class="vp-workspace">
+      <div class="vp-top">
+        <div class="vp-top-heading">
+          <div class="vp-brand-row">
+            <span class="vp-brand"><em>Bone</em> 影视工厂</span>
+            <span class="vp-version" id="topVersion" hidden></span>
+          </div>
+          <strong id="topTitle">尚未创建作品</strong>
+        </div>
+        <span class="vp-muted" id="topCounts" hidden></span>
+        <button class="vp-button" id="dirToggle">
+          <svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h10"/></svg>
+          作品目录
+        </button>
+        <button class="vp-button" id="refresh" disabled>
+          <svg viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-2.6-6.3M21 4v5h-5"/></svg>
+          刷新
+        </button>
+      </div>
+      <nav class="vp-tabs" id="tabs" hidden></nav>
+      <div class="vp-body" id="body">
+        <div class="vp-empty">
+          <div class="vp-media">🎬</div>
+          <strong>还没有作品</strong>
+          <p>点「作品目录」里的「新建作品」自己建一个，或在对话里让 Agent 创建：<br /><code>帮我创建一个漫剧作品《星尘旅人》，少女乘星尘列车穿越废弃星站</code><br />剧本、资产与分镜随后由 Agent 逐步写入，这里负责浏览。</p>
+           <button class="vp-button primary" id="refreshEmpty">新建作品</button>
+      </div>
+    </div>
+     <!-- 新建作品：字段与 Agent 的 create_production 完全一致，两条入口写同一存储 -->
+     <dialog id="createDialog" class="vp-dialog">
+       <form id="createForm" method="dialog">
+         <header class="vp-dialog-head">
+           <div>
+             <strong id="dialogTitle">新建影像作品</strong>
+             <small id="dialogHint">确认后立即创建；剧本、资产与分镜随后由 Agent 逐步写入。</small>
+           </div>
+           <button type="button" class="vp-button" id="createCancel">关闭</button>
+         </header>
+         <div class="vp-dialog-body">
+           <label class="vp-field">
+             <span>标题<em>*</em></span>
+             <input name="title" required maxlength="80" placeholder="例如：星尘旅人" autocomplete="off" />
+           </label>
+           <div class="vp-field-pair">
+           <div class="vp-field-pair">
+             <div class="vp-field">
+               <span>类型</span>
+               <div class="vp-select" data-name="kind" data-value="comic">
+                 <button type="button" class="vp-select-trigger" role="combobox" aria-haspopup="listbox" aria-expanded="false">
+                   <span class="vp-select-value">漫剧</span>
+                   <svg viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg>
+                 </button>
+                 <ul class="vp-select-menu" role="listbox" hidden>
+                   <li role="option" data-value="comic" aria-selected="true">漫剧</li>
+                   <li role="option" data-value="film" aria-selected="false">影片</li>
+                   <li role="option" data-value="promo" aria-selected="false">宣传片</li>
+                   <li role="option" data-value="image" aria-selected="false">图片</li>
+                 </ul>
+               </div>
+             </div>
+             <div class="vp-field">
+               <span>比例</span>
+               <div class="vp-select" data-name="ratio" data-value="16:9">
+                 <button type="button" class="vp-select-trigger" role="combobox" aria-haspopup="listbox" aria-expanded="false">
+                   <span class="vp-select-value">16:9 横屏</span>
+                   <svg viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg>
+                 </button>
+                 <ul class="vp-select-menu" role="listbox" hidden>
+                   <li role="option" data-value="16:9" aria-selected="true">16:9 横屏</li>
+                   <li role="option" data-value="9:16" aria-selected="false">9:16 竖屏</li>
+                   <li role="option" data-value="1:1" aria-selected="false">1:1 方形</li>
+                   <li role="option" data-value="4:3" aria-selected="false">4:3</li>
+                   <li role="option" data-value="2.39:1" aria-selected="false">2.39:1 宽银幕</li>
+                 </ul>
+               </div>
+             </div>
+           </div>
+           </div>
+           <div class="vp-field-pair">
+             <label class="vp-field">
+               <span>美术风格</span>
+               <input name="style" maxlength="200" placeholder="赛博朋克 / 水墨 / 厚涂…" autocomplete="off" />
+             </label>
+             <label class="vp-field">
+               <span>帧率</span>
+               <input name="fps" type="number" min="0" max="240" step="1" value="24" />
+             </label>
+           </div>
+           <label class="vp-field">
+             <span>简介</span>
+             <textarea name="brief" rows="3" maxlength="2000" placeholder="核心内容、题材与受众"></textarea>
+           </label>
+           <label class="vp-field">
+             <span>全片故事线</span>
+             <textarea name="arc" rows="3" maxlength="4000" placeholder="每集剧情如何串成一条主线；剧本按集写，这里是跨集视角"></textarea>
+           </label>
+           <div class="vp-field-pair">
+             <label class="vp-field">
+               <span>配音</span>
+               <input name="voice" maxlength="2000" placeholder="例如：女声，温柔" autocomplete="off" />
+             </label>
+             <label class="vp-field">
+               <span>音乐</span>
+               <input name="music" maxlength="2000" placeholder="例如：氛围电子" autocomplete="off" />
+             </label>
+           </div>
+           <p class="vp-dialog-error" id="createError" hidden></p>
+         </div>
+         <footer class="vp-dialog-foot">
+           <span class="vp-muted">标题必填；其余可创建后继续修改。</span>
+           <button type="submit" class="vp-button primary" id="createSubmit">创建作品</button>
+         </footer>
+       </form>
+     </dialog>
+     <!-- 删除确认：永久删除不可撤销，所以单独弹窗并写明后果 -->
+     <dialog id="confirmDialog" class="vp-dialog vp-dialog-small">
+       <div class="vp-dialog-head">
+         <div>
+           <strong id="confirmTitle">删除作品</strong>
+           <small id="confirmHint"></small>
+         </div>
+       </div>
+       <div class="vp-dialog-body">
+         <p class="vp-muted" id="confirmDetail"></p>
+       </div>
+       <div class="vp-dialog-foot">
+         <span class="vp-muted">删除后无法恢复。</span>
+         <div class="vp-row-actions">
+           <button type="button" class="vp-button" id="confirmCancel">取消</button>
+           <button type="button" class="vp-button vp-button-danger" id="confirmOk">永久删除</button>
+         </div>
+       </div>
+     </dialog>
+    <script src="./media-preview.js"></script>
+    <script src="./sequence-preview.js"></script>
+    <script src="./editorial.js"></script>
+    <script src="./revisions.js"></script>
+    <script src="./storyboard.js"></script>
+    <script src="./project-bible.js"></script>
+    <script src="./asset-details.js"></script>
+    <script>
+      "use strict";
+      const bridge = window.pluginBridge;
+      const bodyEl = document.getElementById("body");
+      const tabsEl = document.getElementById("tabs");
+      const topTitle = document.getElementById("topTitle");
+      const topCounts = document.getElementById("topCounts");
+      const refreshBtn = document.getElementById("refresh");
+      const refreshEmpty = document.getElementById("refreshEmpty");
+      const dirToggle = document.getElementById("dirToggle");
+
+      // Follow the host appearance.
+      const themeQuery = window.matchMedia("(prefers-color-scheme: dark)");
+      function applyTheme() {
+        document.documentElement.dataset.theme = themeQuery.matches ? "dark" : "light";
+      }
+      themeQuery.addEventListener("change", applyTheme);
+      applyTheme();
+
+      const KIND_LABELS = { comic: "漫剧", film: "影片", promo: "宣传片", image: "图片" };
+      const JOB_STATUS_LABELS = { running: "运行中", candidate: "待审", failed: "失败", cancelled: "已取消", interrupted: "已中断" };
+      const TABS = [
+        ["project", "项目"],   // 作品简介 + 资产
+        ["script", "剧本"],    // 每集剧本正文
+        ["breakdown", "脚本"], // 叙事节拍拆解
+        ["shots", "分镜"],
+        ["configuration", "制作配置"],
+      ];
+      const SCRIPT_FIELDS = [
+        ["logline", "一句话故事"],
+        ["audiencePromise", "观众承诺"],
+        ["hook", "开场钩子"],
+        ["turningPoint", "核心转折"],
+        ["payoff", "阶段结果"],
+        ["productionNotes", "制作总要求"],
+      ];
+
+      let summaries = [];   // production summaries from bone.list
+      let currentId = null; // active production id
+      let current = null;   // { snapshot } from bone.get
+      let tab = "project";
+      let selectedShotId = null;
+      let scriptEpisodeId = null; // 剧本页与脚本页共用的当前集（两页菜单联动）
+      const ASSET_TYPES = ["角色", "场景", "产品", "道具", "风格", "品牌", "声音"];
+      let assetTypeFilter = "全部";
+      let assetSearch = "";
+      let scriptBeatIndex = 0; // 脚本页左侧选中的叙事要素
+      let directoryOpen = false;
+
+      function el(tag, className, text) {
+        const node = document.createElement(tag);
+        if (className) node.className = className;
+        if (text !== undefined) node.textContent = text;
+        return node;
+      }
+      function fmtTime(ms) {
+        return ms ? new Date(ms).toLocaleString() : "";
+      }
+       // 面板只读展示：日期给到天，修改时间用相对说法更省空间。
+       function fmtDate(ms) {
+         if (!ms) return "—";
+         const d = new Date(ms);
+         const pad = (n) => String(n).padStart(2, "0");
+         return `${d.getFullYear()}/${pad(d.getMonth() + 1)}/${pad(d.getDate())}`;
+       }
+       function fmtRelative(ms) {
+         if (!ms) return "—";
+         const diff = Date.now() - ms;
+         if (diff < 60e3) return "刚刚";
+         if (diff < 3600e3) return `${Math.floor(diff / 60e3)} 分钟前`;
+         if (diff < 86400e3) return `${Math.floor(diff / 3600e3)} 小时前`;
+         if (diff < 7 * 86400e3) return `${Math.floor(diff / 86400e3)} 天前`;
+         return fmtDate(ms);
+       }
+      function setStatus(text) {
+        let bar = document.getElementById("vpStatus");
+        if (!text) { bar?.remove(); return; }
+        if (!bar) { bar = el("div", "vp-error"); bar.id = "vpStatus"; bodyEl.before(bar); }
+        bar.replaceChildren(el("span", null, text));
+      }
+       // 时长按中文习惯输出：不足一分钟给秒，超过给分秒。
+       function fmtDuration(totalSeconds) {
+         const seconds = Math.max(0, Math.round((Number(totalSeconds) || 0) * 1000) / 1000);
+         if (seconds < 60) return `${seconds} 秒`;
+         const minutes = Math.floor(seconds / 60);
+         const rest = Math.round((seconds % 60) * 1000) / 1000;
+         return rest ? `${minutes} 分 ${rest} 秒` : `${minutes} 分`;
+       }
+
+       // 复制走宿主的剪贴板通道（clipboard.write）；失败时退回到可手选的提示。
+       async function copyText(text, okMessage) {
+         try {
+           await bridge.invoke("clipboard.writeText", { text });
+           flash(okMessage || "已复制");
+         } catch (error) {
+           flash(`复制失败：${String(error && error.message || error)}`, true);
+         }
+       }
+
+       let flashTimer = null;
+       function flash(text, isError) {
+         let bar = document.getElementById("vpFlash");
+         if (!bar) { bar = el("div", "vp-info"); bar.id = "vpFlash"; bodyEl.before(bar); }
+         bar.classList.toggle("vp-info-error", Boolean(isError));
+         bar.replaceChildren(el("span", null, text));
+         clearTimeout(flashTimer);
+         flashTimer = setTimeout(() => document.getElementById("vpFlash")?.remove(), 2200);
+       }
+
+       // 给 Agent 的续写指令：只描述现状与缺口，不替 Agent 编内容。
+       function buildAgentPrompt(doc, shots, stale) {
+         const lines = [
+           `继续完善 Bone 影视工厂里的作品 ${doc.id}《${doc.title}》（${KIND_LABELS[doc.kind] || doc.kind}）。`,
+         ];
+         const episodes = Array.isArray(doc.episodes) ? doc.episodes : [];
+         const assets = Array.isArray(doc.assets) ? doc.assets : [];
+         if (!episodes.length) lines.push("• 还没有剧集：先写第一集完整可拍摄正文，再拆脚本节拍。");
+         else {
+           const missing = episodes.filter((ep) => !ep.script?.prose?.trim());
+           if (missing.length) lines.push(`• 这些集缺少剧本正文：${missing.map((ep) => ep.title || ep.id).join("、")}`);
+         }
+         if (!assets.length) lines.push("• 还没有资产：先登记主要角色与场景，再让镜头引用它们。");
+         if (!shots.length) lines.push("• 还没有分镜：按剧本拆镜头，每镜写清画面、运动和对白。");
+         if (stale.length) {
+           lines.push(`• 有 ${stale.length} 个镜头设定已改动、画面需要重做：${stale.slice(0, 5).map((s) => s.title || s.id).join("、")}`);
+         }
+         const unused = assets.filter((asset) => !shots.some((shot) => (shot.assetIds || []).includes(asset.id)));
+         if (unused.length) lines.push(`• 这些资产还没被任何镜头引用：${unused.map((a) => a.name || a.id).join("、")}`);
+         if (lines.length === 1) lines.push("• 已有创作记录，请按实际正文与素材核查准备程度，不能据字段存在宣称审核通过。");
+         lines.push("先用 get_production 和 get_workflow_status 读取现状与缺口。duration 是成片预算，productionPlan 另存生成长度和留量；保留小数。实际素材生成后 register_media、记录 record_media_inspection，再按需采用或 save_edit_plan 选段。用 record_review 区分文本、技术、画面、声音和连续性证据；没有观看或听验时标未验证，不把预览称为最终导出。");
+         return lines.join("\n");
+       }
+
+      function summaryOf(id) { return summaries.find((item) => item.id === id) || null; }
+      function snapshotDoc() { return current?.snapshot.document || null; }
+      function shotsOf(doc) { return Array.isArray(doc?.shots) ? doc.shots : []; }
+      function shotState(snapshot, shotId) { return snapshot.shotStates?.[shotId] || null; }
+      function adoptedImageId(shot) {
+        return (shot.outputs && shot.outputs.image) || shot.mediaId || null;
+      }
+      // 插件已被宿主重载、这一页还是旧文档时，自愈刷新一次（同一版本只试一次）。
+      function selfHealToVersion(version, build) {
+        if (!version || !build || version === build) return false;
+        try {
+          const key = "bonePageReload:" + version;
+          if (sessionStorage.getItem(key)) return false;
+          sessionStorage.setItem(key, "1");
+        } catch {
+          return false; // sessionStorage 不可用时不冒险循环刷新。
+        }
+        location.reload();
+        return true;
+      }
+
+
+      // 上报这一页自己的文档状态：宿主侧据此判断面板是不是旧页面。
+      function reportPage() {
+        const docBuild = document.querySelector('meta[name="bone-build"]')?.content || "";
+        const shownVersion = (document.getElementById("topVersion")?.textContent || "").replace(/^v/, "");
+        try {
+          const sent = bridge.invoke("bone.probe", {
+            build: docBuild,
+            pluginVersion: shownVersion,
+            tabs: [...document.querySelectorAll("#tabs button")].map((b) => b.textContent.trim()),
+            title: document.title,
+            href: location.href,
+          });
+          if (sent && typeof sent.catch === "function") sent.catch(() => {});
+        } catch {
+          // 上报失败不影响页面本身。
+        }
+      }
+
+      // ---------- 启动自检（能力横幅） ----------
+      async function refreshCapabilities() {
+        const versionEl = document.getElementById("topVersion");
+        const existing = document.getElementById("vpBanner");
+
+        let status = null;
+        try {
+          status = await bridge.invoke("bone.status");
+        } catch {
+          existing?.remove(); // 宿主不支持该通道时静默隐藏
+          return;
+        }
+        const version = status?.version ? String(status.version) : "";
+        if (versionEl && version) {
+          versionEl.hidden = false;
+          versionEl.textContent = "v" + version;
+          versionEl.title = "当前运行的插件版本";
+        }
+        // 插件已被宿主重载，但这一页还是旧文档时，自愈刷新一次；再不行就明说。
+        const build = document.querySelector('meta[name="bone-build"]')?.content || "";
+        reportPage();
+        if (selfHealToVersion(version, build) || (build && version && build !== version)) {
+          if (versionEl) {
+            versionEl.title = "面板文档是 v" + build + "，插件是 v" + version + "：关闭这个面板再重新打开即可";
+          }
+          bodyEl.before(
+            (() => {
+              const stale = el("div", "vp-banner");
+              stale.id = "vpStale";
+              const copy = el("div");
+              copy.appendChild(el("strong", null, "面板是旧页面"));
+              copy.appendChild(
+                el("p", null, "插件已更新到 v" + version + "，这一页仍在显示 v" + build + " 的文档：关闭面板后重新打开即可。"),
+              );
+              const again = el("button", "vp-button", "立即刷新");
+              again.addEventListener("click", () => location.reload());
+              copy.appendChild(again);
+              stale.appendChild(copy);
+              return stale;
+            })(),
+          );
+        }
+        existing?.remove();
+        if (!status || (status.agentAvailable && !(status.errors || []).length)) return;
+        const banner = el("div", "vp-banner");
+        banner.id = "vpBanner";
+        const copy = el("div");
+        const title = status.agentAvailable ? "部分工具未注册" : "Agent 工具尚未注册";
+        copy.appendChild(el("strong", null, title));
+        const hint = el("p", null, "当前插件版本 ");
+        hint.appendChild(el("code", null, status.version || "unknown"));
+        hint.append("：请在 Plugins 页对「Bone 影视工厂」执行 More → Reload，并同意新增权限（agent.tool.register）。在此之前，对话里的 Agent 调不到创建/写入工具。");
+        copy.appendChild(hint);
+        const errors = (status.errors || []).slice(0, 2);
+        for (const item of errors) copy.appendChild(el("p", null, item));
+        const retry = el("button", "vp-button", "重新检测");
+        retry.addEventListener("click", () => refreshCapabilities());
+        copy.appendChild(retry);
+        banner.appendChild(copy);
+        bodyEl.before(banner);
+      }
+
+      // ---------- data loading (plugin-owned storage over bridge channels) ----------
+
+      async function loadList() {
+        refreshBtn.disabled = true;
+        setStatus("");
+        try {
+          const result = await bridge.invoke("bone.list");
+          summaries = result.productions || [];
+          if (!summaries.some((item) => item.id === currentId)) {
+            currentId = summaries[0]?.id ?? null;
+            current = null;
+            selectedShotId = null;
+          }
+          await ensureCurrent(true);
+          render();
+          reportPage();
+        } catch (error) {
+          setStatus(`读取失败：${String(error && error.message || error)}`);
+        } finally {
+          refreshBtn.disabled = false;
+        }
+      }
+
+      let productionLoadSequence = 0;
+      async function ensureCurrent(force = false) {
+        const sequence = ++productionLoadSequence;
+        const requestedId = currentId;
+        if (!requestedId) { current = null; return; }
+        if (!force && current?.snapshot?.document?.id === requestedId) return;
+        try {
+          const result = await bridge.invoke("bone.get", { id: requestedId });
+          if (sequence !== productionLoadSequence || requestedId !== currentId) return;
+          current = { snapshot: result.snapshot, workflow: result.workflow };
+        } catch (error) {
+          if (sequence !== productionLoadSequence || requestedId !== currentId) return;
+          current = null;
+          setStatus(`作品 ${requestedId} 读取失败：${String(error && error.message || error)}`);
+        }
+      }
+
+      async function selectProduction(id) {
+        window.BoneMediaPreview.beginRender();
+        window.BoneAssetDetails.beginRender();
+        window.BoneSequencePreview.beginRender();
+        currentId = id;
+        selectedShotId = null;
+        directoryOpen = false;
+        await ensureCurrent();
+        render();
+      }
+
+      // ---------- rendering ----------
+
+      function render() {
+        window.BoneMediaPreview.beginRender();
+        window.BoneAssetDetails.beginRender();
+        window.BoneSequencePreview.beginRender();
+        const hasList = summaries.length > 0;
+        // Reading and storyboard views fill the panel with independently scrolling columns.
+        bodyEl.classList.toggle("vp-body-fill", Boolean(snapshotDoc()) && ["script", "breakdown", "shots"].includes(tab));
+        dirToggle.disabled = !hasList;
+        refreshBtn.disabled = false;
+        const doc = snapshotDoc();
+        const summary = summaryOf(currentId);
+        topTitle.textContent = doc ? (doc.title || doc.id) : hasList ? "选择一个作品" : "尚未创建作品";
+        dirToggle.disabled = false; // 目录里也能新建，所以始终可打开
+        if (doc) {
+          topCounts.textContent = `${KIND_LABELS[doc.kind] || doc.kind} · 镜头 ${shotsOf(doc).length} · 资产 ${(doc.assets || []).length}`;
+        } else {
+          topCounts.hidden = true;
+        }
+        renderDirectory();
+        if (!doc) {
+          tabsEl.hidden = true;
+          renderNoProduction(summary);
+          return;
+        }
+         tabsEl.hidden = false;
+         renderTabs(doc);
+        if (tab === "project") renderProjectTab(current);
+        else if (tab === "script") renderScriptTab(current);
+        else if (tab === "breakdown") renderBreakdownTab(current);
+        else if (tab === "shots") renderShotsTab(current);
+        else renderConfigurationTab(current);
+      }
+
+      function renderTabs(doc) {
+        tabsEl.replaceChildren();
+        for (const [key, label] of TABS) {
+          const button = el("button", null, key === "shots" && doc.kind === "image" ? "图片" : label);
+          if (tab === key) button.setAttribute("aria-current", "page");
+          button.addEventListener("click", () => { tab = key; selectedShotId = null; render(); });
+          tabsEl.appendChild(button);
+        }
+      }
+
+      function renderNoProduction(summary) {
+        const empty = el("div", "vp-empty");
+        if (summary?.broken) {
+          empty.appendChild(el("div", "vp-media", "⚠️"));
+          empty.appendChild(el("strong", null, "当前作品数据无法读取"));
+          empty.appendChild(el("p", null, `作品 ${summary.id} 的数据损坏或格式不受支持。`));
+        } else if (summaries.length) {
+          empty.appendChild(el("div", "vp-media", "🎬"));
+          empty.appendChild(el("strong", null, "选择一个作品"));
+          empty.appendChild(el("p", null, "从左上角的作品目录中选择要查看的影像作品。"));
+          const open = el("button", "vp-button primary", "打开作品目录");
+          open.addEventListener("click", () => { directoryOpen = true; render(); });
+          empty.appendChild(open);
+        } else {
+          empty.appendChild(el("div", "vp-media", "🎬"));
+          empty.appendChild(el("strong", null, "还没有作品"));
+          empty.appendChild(el("p", null, "在对话里让 Agent 创建第一个影像作品，例如：「帮我创建一个漫剧作品《星尘旅人》」，然后回这里刷新浏览。"));
+          const refresh = el("button", "vp-button primary", "刷新");
+          refresh.addEventListener("click", () => loadList());
+          empty.appendChild(refresh);
+        }
+        bodyEl.replaceChildren(empty);
+      }
+
+      function renderDirectory() {
+        document.getElementById("vpDirectory")?.remove();
+        document.getElementById("vpOverlay")?.remove();
+        if (!directoryOpen) return;
+        const overlay = el("div");
+        overlay.id = "vpOverlay";
+        overlay.className = "vp-overlay";
+        overlay.addEventListener("click", () => { directoryOpen = false; render(); });
+        const dir = el("div");
+        dir.id = "vpDirectory";
+        dir.className = "vp-directory";
+        const head = el("header");
+        head.appendChild(el("strong", null, summaries.length ? `作品目录（${summaries.length}）` : "作品目录"));
+        const close = el("button", "vp-button", "关闭");
+        close.addEventListener("click", () => { directoryOpen = false; render(); });
+        head.appendChild(close);
+        dir.appendChild(head);
+
+        // 新建入口放在目录里：目录同时是"选作品"和"加作品"的地方。
+        const createButton = el("button", "vp-button primary vp-directory-create", "＋ 新建作品");
+        createButton.addEventListener("click", () => {
+          directoryOpen = false;
+          render();
+          openCreateDialog();
+        });
+        dir.appendChild(createButton);
+
+        if (!summaries.length) {
+          dir.appendChild(el("p", "vp-directory-empty",
+            "还没有作品。点上面的「新建作品」创建第一个，或让 Agent 在对话里创建。"));
+        }
+        for (const summary of summaries) {
+          const row = el("div", "vp-directory-item" + (summary.id === currentId ? " active" : ""));
+          const main = el("button", "vp-directory-main");
+          main.appendChild(el("div", "dir-thumb", summary.kind ? "🎞️" : "⚠️"));
+          const text = el("span");
+          text.appendChild(el("strong", null, summary.title || summary.id));
+          text.appendChild(el("small", null, summary.broken
+            ? "数据无法读取"
+            : `${KIND_LABELS[summary.kind] || summary.kind || "未知"} · 镜头 ${summary.shotCount}`));
+          main.appendChild(text);
+          if (summary.broken) {
+            main.disabled = true;
+          } else {
+            main.addEventListener("click", () => selectProduction(summary.id));
+          }
+          row.appendChild(main);
+
+          // 行内操作：编辑设定 / 删除。hover 才完全显现，避免目录显脏。
+          const actions = el("div", "vp-directory-actions");
+          if (!summary.broken) {
+            const editBtn = el("button", "vp-item-action", "✎");
+            editBtn.title = "编辑设定";
+            editBtn.setAttribute("aria-label", `编辑 ${summary.title || summary.id}`);
+            editBtn.addEventListener("click", async (event) => {
+              event.stopPropagation();
+              await selectProduction(summary.id);
+              if (current?.snapshot?.document?.id === summary.id) {
+                openEditDialog(current.snapshot.document);
+              }
+            });
+            actions.appendChild(editBtn);
+          }
+          const delBtn = el("button", "vp-item-action danger", "🗑");
+          delBtn.title = "删除作品";
+          delBtn.setAttribute("aria-label", `删除 ${summary.title || summary.id}`);
+          delBtn.addEventListener("click", (event) => {
+            event.stopPropagation();
+            askDeleteProduction(summary);
+          });
+          actions.appendChild(delBtn);
+          row.appendChild(actions);
+          dir.appendChild(row);
+        }
+        bodyEl.before(overlay, dir);
+      }
+
+      // 项目页：作品设定 + 资产（剧本与脚本各自成页）
+      function renderProjectTab(prod) {
+        const doc = prod.snapshot.document;
+        const shots = shotsOf(doc);
+        const episodes = Array.isArray(doc.episodes) ? doc.episodes : [];
+        const stale = shots.filter((shot) => shotState(prod.snapshot, shot.id)?.needsUpdate);
+        const section = el("div", "vp-section");
+
+        const intro = el("div", "vp-card");
+        const introHead = el("div", "vp-card-head");
+        introHead.appendChild(el("h3", null, "作品简介"));
+        const headActions = el("div", "vp-row-actions");
+        const editButton = el("button", "vp-button", "编辑设定");
+        editButton.addEventListener("click", () => openEditDialog(doc));
+        headActions.appendChild(editButton);
+        const refButton = el("button", "vp-button", "引用到 Agent");
+        refButton.addEventListener("click", () => copyText(buildAgentPrompt(doc, shots, stale), "指令已复制，去对话里粘贴"));
+        headActions.appendChild(refButton);
+        introHead.appendChild(headActions);
+        intro.appendChild(introHead);
+
+        const titleRow = el("div", "vp-project-title");
+        titleRow.appendChild(el("h2", null, doc.title || "未命名作品"));
+        const badges = el("div", "project-tags");
+        badges.appendChild(el("b", null, KIND_LABELS[doc.kind] || doc.kind || "影像作品"));
+        if (doc.ratio) badges.appendChild(el("b", null, doc.ratio));
+        if (doc.kind !== "image" && doc.fps) badges.appendChild(el("b", null, `${doc.fps} fps`));
+        if (doc.style) badges.appendChild(el("b", null, `风格 ${doc.style}`));
+        titleRow.appendChild(badges);
+        intro.appendChild(titleRow);
+
+        intro.appendChild(el("p", "vp-summary",
+          doc.brief || "尚未填写简介，可在面板新建时填写，或让 Agent 读取作品后补全。"));
+        intro.appendChild(el("p", "vp-project-sound",
+          `声音：${doc.voice || "未设置"} · 配乐：${doc.music || "未设置"}`));
+
+        const introMeta = el("div", "vp-project-meta");
+        introMeta.appendChild(el("span", null, `版本 v${doc.revision}`));
+        introMeta.appendChild(el("span", null, `创建 ${fmtDate(doc.createdAt)}`));
+        introMeta.appendChild(el("span", null, `更新 ${fmtRelative(doc.updatedAt)}`));
+        introMeta.appendChild(el("span", "vp-project-meta-spacer"));
+        introMeta.appendChild(el("code", "vp-code", doc.id));
+        const copyId = el("button", "vp-button", "复制 ID");
+        copyId.addEventListener("click", () => copyText(doc.id, "作品 ID 已复制"));
+        introMeta.appendChild(copyId);
+        intro.appendChild(introMeta);
+        section.appendChild(intro);
+        section.appendChild(window.BoneProjectBible.render(doc, { copyText }));
+        section.appendChild(renderAssetsCard(prod));
+        bodyEl.replaceChildren(section);
+      }
+
+      // 资产：卡片形式 + 原项目的类型分类
+      function renderAssetsCard(prod) {
+        const doc = prod.snapshot.document;
+        const assets = Array.isArray(doc.assets) ? doc.assets : [];
+        const shots = shotsOf(doc);
+        const card = el("div", "vp-card");
+
+        const head = el("div", "vp-card-head");
+        head.appendChild(el("h3", null, "资产"));
+        const locked = assets.filter((asset) => asset.locked).length;
+        head.appendChild(el("span", "vp-muted",
+          assets.length ? `${assets.length} 项${locked ? ` · ${locked} 已锁定` : ""}` : ""));
+        card.appendChild(head);
+        const legacyCharacters = window.BoneAssetDetails.legacy(doc, copyText);
+        if (legacyCharacters) card.appendChild(legacyCharacters);
+
+        if (!assets.length) {
+          card.appendChild(el("p", "vp-muted vp-card-note",
+            "还没有资产；让 Agent 从剧本里提炼角色、场景与道具，镜头引用它们以保证一致性。"));
+          return card;
+        }
+
+        // 搜索 + 分类
+        const tools = el("div", "asset-tools");
+        const search = el("label", "asset-search");
+        search.appendChild(el("span", null, "🔍"));
+        const input = document.createElement("input");
+        input.type = "search";
+        input.placeholder = "搜索资产名称或说明";
+        input.value = assetSearch;
+        input.addEventListener("input", () => {
+          assetSearch = input.value;
+          render();
+          // 重新渲染后把焦点放回搜索框
+          const again = document.querySelector(".asset-search input");
+          if (again) { again.focus(); again.setSelectionRange(again.value.length, again.value.length); }
+        });
+        search.appendChild(input);
+        tools.appendChild(search);
+        card.appendChild(tools);
+
+        const counts = new Map();
+        for (const asset of assets) counts.set(asset.type, (counts.get(asset.type) || 0) + 1);
+        const filters = el("div", "asset-type-filters");
+        for (const type of ["全部", ...ASSET_TYPES]) {
+          const count = type === "全部" ? assets.length : counts.get(type) || 0;
+          if (type !== "全部" && !count) continue; // 没有该类型就不占位
+          const chip = el("button", "asset-type-filter", type);
+          chip.setAttribute("aria-pressed", String(assetTypeFilter === type));
+          chip.appendChild(el("span", null, String(count)));
+          chip.addEventListener("click", () => {
+            assetTypeFilter = type;
+            render();
+          });
+          filters.appendChild(chip);
+        }
+        card.appendChild(filters);
+
+        const keyword = assetSearch.trim().toLowerCase();
+        const visible = assets.filter((asset) => {
+          if (assetTypeFilter !== "全部" && asset.type !== assetTypeFilter) return false;
+          if (!keyword) return true;
+          return `${asset.name || ""} ${asset.description || ""} ${asset.profile || ""} ${asset.imagePrompt || ""} ${asset.negativePrompt || ""} ${asset.type || ""}`
+            .toLowerCase().includes(keyword);
+        });
+
+        if (!visible.length) {
+          card.appendChild(el("p", "vp-muted vp-card-note", "没有匹配的资产"));
+          return card;
+        }
+
+        const grid = el("div", "asset-grid");
+        for (const asset of visible) {
+          const usedBy = shots.filter((shot) => (shot.assetIds || []).includes(asset.id)).length;
+          const item = el("div", "asset-card");
+          const open = el("button", "asset-card-open"); open.type = "button";
+          open.setAttribute("aria-label", `查看${asset.name || asset.id}详情`);
+          open.setAttribute("aria-haspopup", "dialog");
+          const preview = el("div", "asset-card-preview");
+          if (asset.mediaId && asset.type !== "声音") preview.appendChild(window.BoneMediaPreview.create({
+            productionId: doc.id, mediaId: asset.mediaId, kind: "image",
+            title: asset.name || "资产", zoom: false, load: args => bridge.invoke("bone.media", args),
+          }));
+          else preview.textContent = asset.type === "声音" ? "♫" : "📦";
+          open.appendChild(preview);
+          const info = el("div", "asset-card-info");
+          info.appendChild(el("strong", null, asset.name || asset.id || "未命名"));
+          const metaRow = el("div", "asset-card-meta");
+          metaRow.appendChild(el("span", null, asset.type || "未分类"));
+          metaRow.appendChild(el("span", null, usedBy ? `${usedBy} 镜引用` : "未使用"));
+          info.appendChild(metaRow);
+          if (asset.locked) info.appendChild(el("span", "vp-badge", "🔒 已锁定"));
+          open.appendChild(info);
+          item.appendChild(open);
+          item.appendChild(window.BoneAssetDetails.render(asset, doc, copyText, open, () => window.BoneMediaPreview.create({
+            productionId: doc.id, mediaId: asset.mediaId, kind: asset.type === "声音" ? "audio" : "image",
+            title: asset.name || "资产", zoom: false, load: args => bridge.invoke("bone.media", args),
+          })));
+          grid.appendChild(item);
+        }
+        card.appendChild(grid);
+        return card;
+      }
+
+      // 脚本页用到的常量；与函数分开维护，避免整段搬动时被误删
+      const SCRIPT_ELEMENTS = [
+        ["hook", "开场钩子"],
+        ["turningPoint", "核心转折"],
+        ["payoff", "阶段结果"],
+        ["audiencePromise", "观众承诺"],
+        ["productionNotes", "制作总要求"],
+      ];
+      const BEAT_PURPOSE_LABELS = {
+        hook: "开场钩子",
+        setup: "情境建立",
+        "inciting-incident": "触发事件",
+        "rising-action": "推进升级",
+        reveal: "信息揭示",
+        turn: "核心转折",
+        resolution: "核心解折",
+        tag: "余波",
+      };
+      // 剧本页：左菜单选集、右侧读剧本正文（一篇文章）
+      function renderScriptTab(prod) {
+        const doc = prod.snapshot.document;
+        const shots = shotsOf(doc);
+        const episodes = Array.isArray(doc.episodes) ? doc.episodes : [];
+        if (!episodes.length) {
+          const empty = el("div", "vp-empty");
+          empty.appendChild(el("div", "vp-media", "📜"));
+          empty.appendChild(el("strong", null, "还没有剧集"));
+          empty.appendChild(el("p", null, "让 Agent 用「写剧本」或「整部剧本」先建立第一集。"));
+          bodyEl.replaceChildren(empty);
+          return;
+        }
+        if (!episodes.some((episode) => episode.id === scriptEpisodeId)) {
+          scriptEpisodeId = episodes[0].id;
+        }
+        const split = el("div", "vp-ep-split");
+
+        const menu = el("aside", "vp-ep-menu");
+        for (const [index, episode] of episodes.entries()) {
+          const item = el("button", "vp-ep-menu-item" + (episode.id === scriptEpisodeId ? " active" : ""));
+          item.appendChild(el("span", "vp-ep-index", String(index + 1).padStart(2, "0")));
+          item.appendChild(el("strong", null, episode.title || episode.id || "未命名集"));
+          item.addEventListener("click", () => {
+            scriptEpisodeId = episode.id;
+            render();
+          });
+          menu.appendChild(item);
+        }
+        split.appendChild(menu);
+
+        const selected = episodes.find((episode) => episode.id === scriptEpisodeId) || episodes[0];
+        const script = selected.script && typeof selected.script === "object" ? selected.script : null;
+        const prose = String(script?.prose || "").trim();
+        const beats = Array.isArray(script?.beats) ? script.beats : [];
+        const selectedShots = shots.filter((shot) => shot.episodeId === selected.id);
+        const reader = el("div", "vp-ep-reader");
+
+        const readerHead = el("div", "vp-ep-reader-head");
+        const headCopy = el("div", "vp-ep-reader-copy");
+        headCopy.appendChild(el("h4", null, selected.title || selected.id || "未命名集"));
+        const headMeta = el("div", "vp-ep-reader-meta");
+        headMeta.appendChild(el("span", null, `${selectedShots.length} 镜`));
+        headMeta.appendChild(el("span", null, fmtDuration(
+          selectedShots.reduce((sum, shot) => sum + (Number(shot.duration) || 0), 0))));
+        const target = Number(script?.targetDurationSeconds) || 0;
+        if (target) headMeta.appendChild(el("span", null, `目标 ${fmtDuration(target)}`));
+        if (prose) headMeta.appendChild(el("span", null, `${prose.replace(/\s+/g, "").length} 字`));
+        if (beats.length) headMeta.appendChild(el("span", null, `脚本 ${beats.length} 节拍`));
+        headCopy.appendChild(headMeta);
+        readerHead.appendChild(headCopy);
+        const openBreakdown = el("button", "vp-button", "查看脚本");
+        openBreakdown.addEventListener("click", () => {
+          tab = "breakdown";
+          scriptEpisodeId = selected.id;
+          scriptBeatIndex = 0;
+          render();
+        });
+        readerHead.appendChild(openBreakdown);
+        reader.appendChild(readerHead);
+
+        if (!prose) {
+          reader.appendChild(el("p", "vp-ep-empty",
+            beats.length
+              ? "这一集还没有剧本正文（只有脚本节拍）。让 Agent 补写剧本：把故事写成一篇连续的文章。"
+              : "这一集还没有剧本：让 Agent 写正文，再拆脚本节拍。"));
+        } else {
+          if (script.logline) reader.appendChild(el("p", "vp-ep-prose-lead", script.logline));
+          const article = el("article", "vp-ep-prose");
+          for (const paragraph of prose.split(/\n\s*\n/).map((part) => part.trim()).filter(Boolean)) {
+            article.appendChild(el("p", null, paragraph));
+          }
+          reader.appendChild(article);
+        }
+        split.appendChild(reader);
+        bodyEl.replaceChildren(split);
+      }
+
+      function renderBreakdownTab(prod) {
+        const doc = prod.snapshot.document;
+        const shots = shotsOf(doc);
+        const episodes = Array.isArray(doc.episodes) ? doc.episodes : [];
+        if (!episodes.length) {
+          const empty = el("div", "vp-empty");
+          empty.appendChild(el("div", "vp-media", "📜"));
+          empty.appendChild(el("strong", null, "还没有剧集"));
+          empty.appendChild(el("p", null, "让 Agent 用「写剧本」或「整部剧本」先建立第一集。"));
+          bodyEl.replaceChildren(empty);
+          return;
+        }
+        if (!episodes.some((episode) => episode.id === scriptEpisodeId)) {
+          scriptEpisodeId = episodes[0].id;
+          scriptBeatIndex = 0;
+        }
+        const ep = episodes.find((episode) => episode.id === scriptEpisodeId);
+        const script = ep.script && typeof ep.script === "object" ? ep.script : {};
+        const beats = Array.isArray(script.beats) ? script.beats : [];
+        const epShots = shots.filter((shot) => shot.episodeId === ep.id);
+        const shotById = new Map(epShots.map((shot) => [shot.id, shot]));
+        const epSeconds = epShots.reduce((sum, shot) => sum + (Number(shot.duration) || 0), 0);
+        const mappedShots = beats.reduce((sum, beat) => sum + (beat.shotIds || []).filter((id) => shotById.has(id)).length, 0);
+        const elements = SCRIPT_ELEMENTS.filter(([key]) => script[key]);
+
+        // ---- 工具条 ----
+        const bar = el("div", "vp-script-bar");
+        bar.appendChild(el("span", "vp-script-kicker", "SCREENPLAY"));
+        const chooser = el("div", "vp-chiprow");
+        for (const episode of episodes) {
+          const chip = el("button", "vp-chip" + (episode.id === ep.id ? " active" : ""), episode.title || episode.id);
+          chip.addEventListener("click", () => {
+            scriptEpisodeId = episode.id;
+            scriptBeatIndex = 0;
+            render();
+          });
+          chooser.appendChild(chip);
+        }
+        bar.appendChild(chooser);
+
+        const stats = el("div", "vp-script-stats");
+        stats.appendChild(el("span", null, beats.length ? `${beats.length} 个节拍` : "无节拍"));
+        stats.appendChild(el("span", null, `${mappedShots}/${epShots.length} 镜已映射`));
+        const target = Number(script.targetDurationSeconds) || 0;
+        stats.appendChild(el("span", null, target
+          ? `${fmtDuration(epSeconds)} / 目标 ${fmtDuration(target)}`
+          : fmtDuration(epSeconds)));
+        bar.appendChild(stats);
+
+        const actions = el("div", "vp-row-actions");
+        const agentBtn = el("button", "vp-button", "复制给 Agent");
+        agentBtn.addEventListener("click", () => copyText(
+          buildAgentPrompt(doc, shots, shots.filter((shot) => shotState(prod.snapshot, shot.id)?.needsUpdate)),
+          "指令已复制，去对话里粘贴",
+        ));
+        actions.appendChild(agentBtn);
+        const shotsBtn = el("button", "vp-button", "去分镜");
+        shotsBtn.addEventListener("click", () => { tab = "shots"; selectedShotId = epShots[0]?.id ?? null; render(); });
+        actions.appendChild(shotsBtn);
+        bar.appendChild(actions);
+
+        const layout = el("div", "vp-script-layout");
+
+        // ---- 左栏：节拍索引 ----
+        const aside = el("aside", "vp-script-aside");
+        const asideHead = el("div", "vp-script-aside-head");
+        asideHead.appendChild(el("span", "vp-script-aside-title", "叙事节拍"));
+        asideHead.appendChild(el("span", "vp-script-aside-count", String(beats.length)));
+        aside.appendChild(asideHead);
+
+        if (!beats.length) {
+          aside.appendChild(el("p", "vp-script-aside-empty",
+            elements.length ? "这一集只有整集要素，还没有拆成节拍。" : "这一集还没有剧本内容。"));
+        }
+        const beatEntries = beats.map((beat) => {
+          const mapped = (beat.shotIds || []).filter((id) => shotById.has(id));
+          const seconds = mapped.reduce((sum, id) => sum + (Number(shotById.get(id).duration) || 0), 0);
+          return { beat, mapped, seconds };
+        });
+        beatEntries.forEach(({ beat, mapped, seconds }, index) => {
+          const item = el("button", "vp-beat" + (index === scriptBeatIndex ? " active" : ""));
+          item.appendChild(el("span", "vp-beat-index", String(index + 1).padStart(2, "0")));
+          const copy = el("span", "vp-beat-copy");
+          copy.appendChild(el("small", "vp-beat-purpose", BEAT_PURPOSE_LABELS[beat.purpose] || beat.purpose || "节拍"));
+          copy.appendChild(el("strong", null, beat.title || "未命名节拍"));
+          copy.appendChild(el("span", "vp-beat-meta",
+            mapped.length ? `${mapped.length} 镜 · ${fmtDuration(seconds)}` : "尚未分镜"));
+          item.appendChild(copy);
+          item.addEventListener("click", () => { scriptBeatIndex = index; render(); });
+          aside.appendChild(item);
+        });
+        layout.appendChild(aside);
+
+        // ---- 右栏 ----
+        const main = el("div", "vp-script-main");
+
+        const arc = el("div", "vp-script-arc");
+        const arcHead = el("button", "vp-script-arc-head");
+        arcHead.appendChild(el("strong", null, "本集故事弧"));
+        const chainText = [
+          script.logline ? "一句话故事" : null,
+          script.hook ? "开场钩子" : null,
+          script.turningPoint ? "核心转折" : null,
+          script.payoff ? "阶段结果" : null,
+        ].filter(Boolean).join(" → ");
+        arcHead.appendChild(el("span", "vp-script-arc-chain", chainText || "尚未填写"));
+        arcHead.appendChild(el("span", "vp-script-arc-toggle", "展开全文"));
+        const arcBody = el("div", "vp-script-arc-body");
+        arcBody.hidden = true;
+        for (const [key, label] of [["logline", "一句话故事"], ...SCRIPT_ELEMENTS]) {
+          if (!script[key]) continue;
+          const field = el("div", "vp-script-arc-field");
+          field.appendChild(el("span", null, label));
+          field.appendChild(el("p", null, String(script[key])));
+          arcBody.appendChild(field);
+        }
+        arcHead.addEventListener("click", () => {
+          arcBody.hidden = !arcBody.hidden;
+          arcHead.querySelector(".vp-script-arc-toggle").textContent = arcBody.hidden ? "展开全文" : "收起";
+        });
+        arc.appendChild(arcHead);
+        arc.appendChild(arcBody);
+        main.appendChild(arc);
+
+        const total = beats.length;
+        // 只有整集要素、没有节拍的旧数据走下面的回退展示，不算"没有剧本"。
+        if (!total && !elements.length) {
+          const empty = el("div", "vp-empty");
+          empty.appendChild(el("div", "vp-media", "📜"));
+          empty.appendChild(el("strong", null, "这一集还没有剧本"));
+          empty.appendChild(el("p", null, "让 Agent 为「" + (ep.title || ep.id) + "」写剧本：整集七要素 + 有序叙事节拍。"));
+          main.appendChild(empty);
+          layout.appendChild(main);
+          const wrapEmpty = el("div", "vp-script-page");
+          wrapEmpty.appendChild(bar);
+          wrapEmpty.appendChild(layout);
+          bodyEl.replaceChildren(wrapEmpty);
+          return;
+        }
+        if (scriptBeatIndex >= total) scriptBeatIndex = 0;
+
+        const detail = el("section", "vp-script-beat-detail");
+        if (scriptBeatIndex < beats.length) {
+          const { beat, mapped, seconds } = beatEntries[scriptBeatIndex];
+          const head = el("div", "vp-script-beat-head");
+          head.appendChild(el("span", "vp-script-beat-kicker", BEAT_PURPOSE_LABELS[beat.purpose] || "BEAT"));
+          head.appendChild(el("span", "vp-script-beat-count", `${mapped.length} 个镜头`));
+          detail.appendChild(head);
+          detail.appendChild(el("h2", null, beat.title || "未命名节拍"));
+
+          const grid = el("div", "vp-script-beat-grid");
+          for (const [key, label] of [
+            ["dramaticQuestion", "观众问题"],
+            ["synopsis", "节拍概述"],
+            ["visualAction", "视觉动作方向"],
+            ["dialogue", "对白 / 旁白意图"],
+            ["sound", "声音"],
+            ["continuity", "连续性"],
+          ]) {
+            if (!beat[key]) continue;
+            const field = el("div", "vp-script-beat-field");
+            field.appendChild(el("span", null, label));
+            field.appendChild(el("p", null, String(beat[key])));
+            grid.appendChild(field);
+          }
+          if (grid.childElementCount) detail.appendChild(grid);
+
+          const mappedBlock = el("div", "vp-script-mapped");
+          const mappedHead = el("div", "vp-row");
+          mappedHead.appendChild(el("strong", null, "映射分镜"));
+          mappedHead.appendChild(el("span", "vp-muted", `${mapped.length} 个 · ${fmtDuration(seconds)}`));
+          mappedBlock.appendChild(mappedHead);
+          if (!mapped.length) {
+            mappedBlock.appendChild(el("p", "vp-muted", "这个节拍还没有镜头。让 Agent 用「添加分镜」并带上该节拍 id 拆镜头。"));
+          }
+          for (const shotId of mapped) {
+            const shot = shotById.get(shotId);
+            const row = el("button", "vp-script-shot-row");
+            row.appendChild(el("span", "vp-script-shot-index", String(epShots.indexOf(shot) + 1).padStart(2, "0")));
+            const copy = el("span", "vp-script-shot-copy");
+            copy.appendChild(el("strong", null, shot.title || shot.id));
+            const state = shotState(prod.snapshot, shot.id);
+            copy.appendChild(el("small", null, [
+              shot.duration ? `${shot.duration}s` : null,
+              state?.needsUpdate ? "待更新" : adoptedImageId(shot) ? "已采用" : "脚本就绪",
+            ].filter(Boolean).join(" · ")));
+            row.appendChild(copy);
+            row.appendChild(el("span", "vp-script-shot-arrow", "→"));
+            row.addEventListener("click", () => { tab = "shots"; selectedShotId = shot.id; render(); });
+            mappedBlock.appendChild(row);
+          }
+          detail.appendChild(mappedBlock);
+        } else {
+          // 旧数据只有整集要素、没有节拍：作为只读回退显示，不放进左栏。
+          const head = el("div", "vp-script-beat-head");
+          head.appendChild(el("span", "vp-script-beat-kicker", "整集要素"));
+          detail.appendChild(head);
+          detail.appendChild(el("h2", null, ep.title || ep.id));
+          const grid = el("div", "vp-script-beat-grid");
+          for (const [key, label] of [["logline", "一句话故事"], ...SCRIPT_ELEMENTS]) {
+            if (!script[key]) continue;
+            const field = el("div", "vp-script-beat-field");
+            field.appendChild(el("span", null, label));
+            field.appendChild(el("p", null, String(script[key])));
+            grid.appendChild(field);
+          }
+          if (grid.childElementCount) detail.appendChild(grid);
+          detail.appendChild(el("p", "vp-muted",
+            "这一集还没有拆成叙事节拍；让 Agent 用「整部剧本」补写 beats，左栏就会出现节拍索引。"));
+        }
+
+        // 节拍之外还有镜头时提示，避免它们看起来丢了
+        const mappedIds = new Set(beats.flatMap((beat) => beat.shotIds || []));
+        const unmapped = epShots.filter((shot) => !mappedIds.has(shot.id));
+        if (unmapped.length) {
+          const note = el("div", "vp-script-unmapped");
+          const noteHead = el("div", "vp-script-unmapped-head");
+          noteHead.appendChild(el("span", null, `${unmapped.length} 个镜头尚未映射到节拍`));
+          const mapBtn = el("button", "vp-button", "让 Agent 补映射");
+          mapBtn.addEventListener("click", () => {
+            const lines = [
+              `请把 Bone 影视工厂作品 ${doc.id}《${doc.title}》第「${ep.title || ep.id}」集里这 ${unmapped.length} 个镜头映射到对应的叙事节拍：`,
+              ...unmapped.map((shot) => `• ${shot.title || shot.id}（${shot.duration || 0}s）${shot.scene ? "：" + String(shot.scene).slice(0, 40) : ""}`),
+              "当前节拍：" + (beats.map((beat, i) => `${i + 1}. ${beat.title}`).join("；") || "（无）"),
+              "请用 update_shot 带 beatId 逐个挂到最合适的节拍；若都不合适，先用 write_episodes 补一个节拍（注意 beats 是整体替换，要把其余节拍一并带上）。",
+            ];
+            copyText(lines.join("\n"), "指令已复制，去对话里粘贴");
+          });
+          noteHead.appendChild(mapBtn);
+          note.appendChild(noteHead);
+          for (const shot of unmapped) {
+            const row = el("button", "vp-script-shot-row");
+            row.appendChild(el("span", "vp-script-shot-index", String(epShots.indexOf(shot) + 1).padStart(2, "0")));
+            const copy = el("span", "vp-script-shot-copy");
+            copy.appendChild(el("strong", null, shot.title || shot.id));
+            copy.appendChild(el("small", null, shot.duration ? `${shot.duration}s` : "静帧"));
+            row.appendChild(copy);
+            row.appendChild(el("span", "vp-script-shot-arrow", "→"));
+            row.addEventListener("click", () => { tab = "shots"; selectedShotId = shot.id; render(); });
+            note.appendChild(row);
+          }
+          detail.appendChild(note);
+        }
+
+        main.appendChild(detail);
+        layout.appendChild(main);
+        const wrap = el("div", "vp-script-page");
+        wrap.appendChild(bar);
+        wrap.appendChild(layout);
+        bodyEl.replaceChildren(wrap);
+      }
+
+      function renderShotsTab(prod) {
+        const context = window.BoneStoryboard.selection(prod.snapshot.document, scriptEpisodeId, selectedShotId);
+        scriptEpisodeId = context.group?.id ?? null;
+        selectedShotId = context.shot?.id ?? null;
+        const page = window.BoneStoryboard.render(prod.snapshot, context, {
+          editorial: prod.workflow?.editorial,
+          loadMedia: args => bridge.invoke("bone.media", args),
+          preview: (media, options = {}) => window.BoneMediaPreview.create({
+            productionId: prod.snapshot.document.id, mediaId: media.id, kind: media.kind,
+            title: options.title || "镜头素材", zoom: Boolean(options.zoom), load: args => bridge.invoke("bone.media", args),
+          }),
+          onEpisode: (id) => {
+            scriptEpisodeId = id;
+            scriptBeatIndex = 0;
+            selectedShotId = null;
+            render();
+            document.querySelector(".bw-episode-picker summary")?.focus();
+          },
+          onShot: (id) => {
+            selectedShotId = id;
+            render();
+            const card = document.querySelector('.bw-shot[aria-pressed="true"]');
+            card?.focus({ preventScroll: true });
+            card?.scrollIntoView({ block: "nearest", inline: "nearest" });
+          },
+          onCopy: (text) => copyText(text, "已复制，粘贴到对话交给 Agent"),
+          onBeat: (id) => {
+            scriptBeatIndex = Math.max(0, (context.group?.episode?.script?.beats || []).findIndex(beat => beat.id === id));
+            tab = "breakdown";
+            render();
+          },
+          onAsset: (asset) => {
+            if (!asset) return;
+            assetTypeFilter = "全部";
+            assetSearch = asset.name || asset.id;
+            tab = "project";
+            render();
+            document.querySelector(".asset-search input")?.focus();
+            document.querySelector(".asset-grid")?.scrollIntoView({ block: "nearest" });
+          },
+        });
+        bodyEl.replaceChildren(page);
+      }
+
+      function renderConfigurationTab(prod) {
+        const snapshot = prod.snapshot;
+        const section = el("div", "vp-section");
+        if (prod.workflow) {
+          const flow = prod.workflow;
+          const card = el("section", "vp-card");
+          card.setAttribute("aria-label", "Agent 创作流程");
+          card.appendChild(el("h3", null, "Agent 创作流程"));
+          card.appendChild(el("p", "vp-muted", flow.complete ? "已登记的创作链完整，请继续观看检查成片质量。" : flow.next?.message || "先读取作品，检查下一步。"));
+          const issues = (flow.issues || []).slice(0, 5);
+          if (issues.length) {
+            const list = el("ul", "vp-workflow-issues");
+            for (const issue of issues) list.appendChild(el("li", null, issue.message));
+            card.appendChild(list);
+          }
+          if (flow.readiness) {
+            const state = flow.readiness;
+            const summary = el("div", "bw-editorial-metrics");
+            for (const [label, value] of [
+              ["正文已保存", `${state.text.savedEpisodes}/${state.text.totalEpisodes} 集`],
+              ["制作计划", `${state.planning.plannedShots}/${state.planning.totalShots} 镜`],
+              ["主输出已采用", `${state.media.adoptedPrimary}/${state.media.totalShots} 镜`],
+              ["当前有效剪辑", `${state.editing.currentEpisodes}/${state.editing.savedEpisodes} 集`],
+              ["需复核的审核", `${state.review.stale} 项`],
+              ["当前审核结论", `${state.review.supported} 支持 · ${state.review.needsRevision} 修改 · ${state.review.notVerified} 未验证`],
+            ]) {
+              const item = el("div", "bw-editorial-field"); item.append(el("span", "vp-muted", label), el("p", null, value)); summary.append(item);
+            }
+            card.append(summary, el("p", "bw-note", "审核是带证据的评审记录；保存、采用与结构完整均不等于艺术质量或最终交付通过。"));
+          }
+          for (const warning of flow.timingWarnings || []) card.appendChild(el("p", "bw-editorial-warning", warning.message));
+          const next = el("button", "vp-button", "复制下一步给 Agent");
+          next.addEventListener("click", () => copyText(
+            `继续 Bone 影视工厂作品 ${snapshot.document.id}《${snapshot.document.title}》。先读取 get_production 和 get_workflow_status，处理最早的相关缺口。${flow.next?.message || "核查已完成结果。"} 真实素材必须 register_media 后 adopt_media；保留其他已定稿内容。`,
+            "已复制下一步指令",
+          ));
+          card.appendChild(next);
+          section.appendChild(card);
+        }
+        section.appendChild(window.BoneRevisions.render(snapshot, prod.workflow?.revisions, copyText));
+
+         const doc = snapshot.document;
+         const shots = shotsOf(doc);
+         const assets = Array.isArray(doc.assets) ? doc.assets : [];
+         const episodes = Array.isArray(doc.episodes) ? doc.episodes : [];
+         const totalSeconds = shots.reduce((sum, shot) => sum + (Number(shot.duration) || 0), 0);
+
+         // 概览：一行可读的制作体量
+         const overview = el("div", "vp-card");
+         overview.appendChild(el("h3", null, "制作概览"));
+         const stats = el("div", "vp-stat-grid");
+         const statCells = [
+           ["集数", episodes.length],
+           ["镜头", shots.length],
+           ["资产", assets.length],
+           ["成片预算", fmtDuration(totalSeconds)],
+         ];
+         for (const [label, value] of statCells) {
+           const cell = el("div", "vp-stat");
+           cell.appendChild(el("strong", null, String(value)));
+           cell.appendChild(el("span", null, label));
+           stats.appendChild(cell);
+         }
+         overview.appendChild(stats);
+         section.appendChild(overview);
+
+         // 每集时长拆解
+         if (episodes.length) {
+           const byEpisode = el("div", "vp-card");
+           byEpisode.appendChild(el("h3", null, "分集体量"));
+           for (const [index, ep] of episodes.entries()) {
+             const epShots = shots.filter((shot) => shot.episodeId === ep.id);
+             const epSeconds = epShots.reduce((sum, shot) => sum + (Number(shot.duration) || 0), 0);
+             const row = el("div", "vp-line");
+             row.appendChild(el("span", "vp-line-index", String(index + 1).padStart(2, "0")));
+             const name = el("span", "vp-line-name", ep.title || ep.id);
+             row.appendChild(name);
+             row.appendChild(el("span", "vp-muted", `${epShots.length} 镜 · ${fmtDuration(epSeconds)}`));
+             if (ep.script?.targetDurationSeconds) {
+               const gap = ep.script.targetDurationSeconds - epSeconds;
+               const tone = Math.abs(gap) <= 3 ? "ready" : "review";
+               row.appendChild(el("span", `vp-badge ${tone}`, `目标 ${fmtDuration(ep.script.targetDurationSeconds)}`));
+             }
+             byEpisode.appendChild(row);
+           }
+           const orphan = shots.filter((shot) => !episodes.some((ep) => ep.id === shot.episodeId));
+           if (orphan.length) {
+             const row = el("div", "vp-line");
+             row.appendChild(el("span", "vp-line-index", "—"));
+             row.appendChild(el("span", "vp-line-name", "未归属集"));
+             row.appendChild(el("span", "vp-muted", `${orphan.length} 镜 · ${fmtDuration(orphan.reduce((s, x) => s + (Number(x.duration) || 0), 0))}`));
+             byEpisode.appendChild(row);
+           }
+           section.appendChild(byEpisode);
+         }
+
+         // 待更新清单：点击直接跳到该镜头
+         const stale = shots.filter((shot) => shotState(snapshot, shot.id)?.needsUpdate);
+         const staleCard = el("div", "vp-card");
+         staleCard.appendChild(el("h3", null, `待更新镜头（${stale.length}）`));
+         if (!stale.length) {
+           staleCard.appendChild(el("p", "vp-muted", "所有镜头设定都已定稿。"));
+         } else {
+           for (const shot of stale) {
+             const row = el("button", "vp-line vp-line-button");
+             row.appendChild(el("span", "vp-line-index", String(shots.indexOf(shot) + 1).padStart(2, "0")));
+             row.appendChild(el("span", "vp-line-name", shot.title || shot.id));
+             row.appendChild(el("span", "vp-badge review", "待更新"));
+             row.addEventListener("click", () => {
+               tab = "shots";
+               selectedShotId = shot.id;
+               render();
+             });
+             staleCard.appendChild(row);
+           }
+         }
+         section.appendChild(staleCard);
+
+         // 资产引用图：谁是死资产一眼可见
+         if (assets.length) {
+           const refCard = el("div", "vp-card");
+           refCard.appendChild(el("h3", null, "资产引用"));
+           for (const asset of assets) {
+             const used = shots.filter((shot) => (shot.assetIds || []).includes(asset.id)).length;
+             const row = el("div", "vp-line");
+             row.appendChild(el("span", used ? "vp-line-index" : "vp-line-index vp-line-index-quiet", String(used)));
+             row.appendChild(el("span", "vp-line-name", asset.name || asset.id));
+             row.appendChild(el("span", "vp-muted", asset.type || "未分类"));
+             if (asset.locked) row.appendChild(el("span", "vp-badge", "🔒"));
+             if (!used) row.appendChild(el("span", "vp-badge review", "未使用"));
+             refCard.appendChild(row);
+           }
+           section.appendChild(refCard);
+         }
+
+         // 交给 Agent：把作品 id 和一段可直接粘贴的指令复制走
+         const handoff = el("div", "vp-card");
+         handoff.appendChild(el("h3", null, "交给 Agent"));
+         handoff.appendChild(el("p", "vp-muted", "在对话里粘贴下面的 ID 或整段指令，让 Agent 继续完善这个作品。"));
+         const idLine = el("div", "vp-line");
+         idLine.appendChild(el("span", "vp-line-name", "作品 ID"));
+         idLine.appendChild(el("code", "vp-code", doc.id));
+         const copyId = el("button", "vp-button", "复制");
+         copyId.addEventListener("click", () => copyText(doc.id, "作品 ID 已复制"));
+         idLine.appendChild(copyId);
+         handoff.appendChild(idLine);
+         const prompt = buildAgentPrompt(doc, shots, stale);
+         const promptBox = el("div", "vp-prompt");
+         promptBox.textContent = prompt;
+         handoff.appendChild(promptBox);
+         const copyPrompt = el("button", "vp-button primary", "复制指令");
+         copyPrompt.addEventListener("click", () => copyText(prompt, "指令已复制，去对话里粘贴"));
+         handoff.appendChild(copyPrompt);
+         section.appendChild(handoff);
+
+        const jobs = Array.isArray(snapshot.jobs) ? snapshot.jobs : [];
+        const jobsCard = el("div", "vp-card");
+        jobsCard.appendChild(el("h3", null, `制作任务（${jobs.length}）`));
+        if (!jobs.length) {
+          jobsCard.appendChild(el("p", "vp-muted", "暂无生成任务记录。"));
+        } else {
+          const list = el("div", "vp-section");
+          const shots = shotsOf(snapshot.document || {});
+          for (const job of jobs.slice(-8).reverse()) {
+            const record = el("div", "vp-record");
+            const head = el("div", "vp-record-heading");
+            head.appendChild(el("h3", null, job.id || "任务"));
+            head.appendChild(el("span", "vp-badge", JOB_STATUS_LABELS[job.status] || job.status || "未知"));
+            record.appendChild(head);
+            const shot = shots.find((item) => item.id === job.shotId);
+            const meta = el("div", "vp-record-meta");
+            meta.appendChild(el("span", null, shot ? `镜头 ${shot.title || shot.id}` : job.shotId ? `镜头 ${job.shotId}` : "作品级任务"));
+            if (job.createdAt) meta.appendChild(el("time", null, fmtTime(job.createdAt)));
+            record.appendChild(meta);
+            list.appendChild(record);
+          }
+          jobsCard.appendChild(list);
+        }
+        section.appendChild(jobsCard);
+        bodyEl.replaceChildren(section);
+      }
+
+      // ---------- wiring ----------
+      dirToggle.addEventListener("click", () => { directoryOpen = !directoryOpen; render(); });
+       // ---------- 新建 / 编辑作品弹窗 ----------
+       const createDialog = document.getElementById("createDialog");
+       const createForm = document.getElementById("createForm");
+       const createError = document.getElementById("createError");
+       const createSubmit = document.getElementById("createSubmit");
+       const dialogTitle = document.getElementById("dialogTitle");
+       const dialogHint = document.getElementById("dialogHint");
+       let editingId = null; // null = 新建；否则是正在编辑的作品 id
+
+       // ---------- 自定义下拉（替代系统原生 select） ----------
+       const selectWraps = [...createForm.querySelectorAll(".vp-select")];
+
+       function setSelectValue(name, value) {
+         const wrap = selectWraps.find((node) => node.dataset.name === name);
+         if (!wrap) return;
+         const options = [...wrap.querySelectorAll("[role=option]")];
+         const match = options.find((option) => option.dataset.value === value) || options[0];
+         wrap.dataset.value = match.dataset.value;
+         wrap.querySelector(".vp-select-value").textContent = match.textContent;
+         for (const option of options) {
+           option.setAttribute("aria-selected", String(option === match));
+         }
+       }
+       function getSelectValue(name) {
+         return selectWraps.find((node) => node.dataset.name === name)?.dataset.value ?? "";
+       }
+       function closeAllSelects() {
+         for (const wrap of selectWraps) {
+           wrap.querySelector(".vp-select-menu").hidden = true;
+           wrap.querySelector(".vp-select-trigger").setAttribute("aria-expanded", "false");
+         }
+       }
+       for (const wrap of selectWraps) {
+         const trigger = wrap.querySelector(".vp-select-trigger");
+         const menu = wrap.querySelector(".vp-select-menu");
+         trigger.addEventListener("click", (event) => {
+           event.stopPropagation();
+           const wasHidden = menu.hidden;
+           closeAllSelects();
+           menu.hidden = !wasHidden;
+           trigger.setAttribute("aria-expanded", String(!menu.hidden));
+         });
+         for (const option of wrap.querySelectorAll("[role=option]")) {
+           option.addEventListener("click", () => {
+             setSelectValue(wrap.dataset.name, option.dataset.value);
+             closeAllSelects();
+             trigger.focus();
+           });
+         }
+       }
+       document.addEventListener("click", () => closeAllSelects());
+       document.addEventListener("keydown", (event) => {
+         if (event.key === "Escape") closeAllSelects();
+       });
+
+       function resetDialogFields() {
+         createForm.reset();
+         setSelectValue("kind", "comic");
+         setSelectValue("ratio", "16:9");
+         closeAllSelects();
+       }
+
+       function openCreateDialog() {
+         editingId = null;
+         dialogTitle.textContent = "新建影像作品";
+         dialogHint.textContent = "确认后立即创建；剧本、资产与分镜随后由 Agent 逐步写入。";
+         createSubmit.textContent = "创建作品";
+         createError.hidden = true;
+         resetDialogFields();
+         createDialog.showModal();
+         createForm.elements.title.focus();
+       }
+
+       // 编辑复用同一个表单，字段与 create_production / update_production 一致。
+       function openEditDialog(doc) {
+         editingId = doc.id;
+         dialogTitle.textContent = "编辑作品设定";
+         dialogHint.textContent = `修改《${doc.title}》的设定字段；只改这里填的内容，剧本与分镜不受影响。`;
+         createSubmit.textContent = "保存修改";
+         createError.hidden = true;
+         resetDialogFields();
+         const fields = createForm.elements;
+         fields.title.value = doc.title || "";
+         setSelectValue("kind", doc.kind || "comic");
+         setSelectValue("ratio", doc.ratio || "16:9");
+         fields.style.value = doc.style || "";
+         fields.fps.value = String(doc.fps ?? 24);
+         fields.brief.value = doc.brief || "";
+         fields.arc.value = doc.arc || "";
+         fields.voice.value = doc.voice || "";
+         fields.music.value = doc.music || "";
+         createDialog.showModal();
+         fields.title.focus();
+       }
+
+       createForm.addEventListener("submit", async (event) => {
+         event.preventDefault();
+         const data = Object.fromEntries(new FormData(createForm).entries());
+         const payload = {
+           title: String(data.title || "").trim(),
+           kind: getSelectValue("kind") || "comic",
+           ratio: getSelectValue("ratio") || "16:9",
+           fps: Number(data.fps),
+           style: String(data.style || "").trim(),
+           brief: String(data.brief || "").trim(),
+           arc: String(data.arc || "").trim(),
+           voice: String(data.voice || "").trim(),
+           music: String(data.music || "").trim(),
+         };
+         if (!payload.title) {
+           createError.textContent = "标题不能为空。";
+           createError.hidden = false;
+           createForm.elements.title.focus();
+           return;
+         }
+         createSubmit.disabled = true;
+         createError.hidden = true;
+         try {
+           if (editingId) {
+             await bridge.invoke("bone.update", { id: editingId, ...payload });
+             createDialog.close();
+             current = null; // 重新拉取，避免用旧快照渲染
+             await loadList();
+             flash("设定已保存");
+           } else {
+             const created = await bridge.invoke("bone.create", payload);
+             createDialog.close();
+             currentId = created.id;
+             current = null;
+             tab = "project";
+             selectedShotId = null;
+             await loadList();
+             flash(`已创建《${payload.title}》`);
+           }
+         } catch (error) {
+           const action = editingId ? "保存" : "创建";
+           createError.textContent = `${action}失败：${String(error && error.message || error)}`;
+           createError.hidden = false;
+         } finally {
+           createSubmit.disabled = false;
+         }
+       });
+
+       document.getElementById("createCancel").addEventListener("click", () => createDialog.close());
+      refreshBtn.addEventListener("click", () => {
+        void refreshCapabilities();
+        loadList();
+      });
+      refreshEmpty.addEventListener("click", () => openCreateDialog());
+
+      // ---------- 删除确认 ----------
+      const confirmDialog = document.getElementById("confirmDialog");
+      const confirmTitle = document.getElementById("confirmTitle");
+      const confirmHint = document.getElementById("confirmHint");
+      const confirmDetail = document.getElementById("confirmDetail");
+      const confirmOk = document.getElementById("confirmOk");
+      let pendingDelete = null;
+
+      function askDeleteProduction(summary) {
+        pendingDelete = summary;
+        confirmTitle.textContent = "删除作品";
+        confirmHint.textContent = `《${summary.title || summary.id}》`;
+        confirmDetail.textContent =
+          `将永久删除该作品的剧本、${summary.assetCount ?? 0} 个资产与 ${summary.shotCount ?? 0} 个镜头，无法恢复。`;
+        confirmOk.disabled = false;
+        confirmDialog.showModal();
+      }
+
+      document.getElementById("confirmCancel").addEventListener("click", () => {
+        pendingDelete = null;
+        confirmDialog.close();
+      });
+
+      confirmOk.addEventListener("click", async () => {
+        if (!pendingDelete) return;
+        const target = pendingDelete;
+        confirmOk.disabled = true;
+        try {
+          await bridge.invoke("bone.delete", { id: target.id, confirm: true });
+          confirmDialog.close();
+          pendingDelete = null;
+          if (currentId === target.id) {
+            currentId = null;
+            current = null;
+            selectedShotId = null;
+          }
+          await loadList();
+          flash(`已删除《${target.title || target.id}》`);
+        } catch (error) {
+          confirmDetail.textContent = `删除失败：${String(error && error.message || error)}`;
+          confirmOk.disabled = false;
+        }
+      });
+      // 面板重新获得焦点时轻量核对一次版本：插件热重载后不必手动重开面板。
+      window.addEventListener("focus", async () => {
+        try {
+          const status = await bridge.invoke("bone.status");
+          const version = status?.version ? String(status.version) : "";
+          const build = document.querySelector('meta[name="bone-build"]')?.content || "";
+          if (selfHealToVersion(version, build)) return;
+          const versionEl = document.getElementById("topVersion");
+          if (versionEl && version) {
+            versionEl.hidden = false;
+            versionEl.textContent = "v" + version;
+          }
+        } catch {
+          // 宿主不支持 bone.status 时忽略。
+        }
+      });
+
+      void refreshCapabilities();
+      loadList();
+    </script>
+  </body>
+</html>

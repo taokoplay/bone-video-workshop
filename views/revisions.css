@@ -1,0 +1,14 @@
+.bw-revisions { min-width: 0; }
+.bw-revision-actions { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
+.bw-revision-actions .vp-button { white-space: normal; }
+.bw-revision-plan { margin-top: 14px; padding: 12px 0; min-width: 0; }
+.bw-revision-plan > summary { font-size: 12px; font-weight: 550; line-height: 1.8; cursor: pointer; overflow-wrap: anywhere; }
+.bw-revision-text { white-space: pre-wrap; font-size: 11px; line-height: 1.85; overflow-wrap: anywhere; }
+.bw-revision-change { min-width: 0; margin: 12px 0; }
+.bw-revision-change summary { font-size: 11px; line-height: 1.8; cursor: pointer; overflow-wrap: anywhere; }
+.bw-revision-plan summary:focus-visible { outline: 2px solid hsl(var(--ring)); outline-offset: 3px; }
+.bw-revision-diff { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); gap: 18px; margin: 14px 0; }
+.bw-revision-diff section { min-width: 0; }
+.bw-revision-diff h4 { font-size: 11px; font-weight: 550; margin: 0 0 6px; }
+.bw-revision-diff pre { margin: 0; font-family: inherit; font-size: 11px; line-height: 1.85; white-space: pre-wrap; overflow-wrap: anywhere; max-height: 320px; overflow-y: auto; scrollbar-width: thin; }
+@media (max-width:600px) { .bw-revision-diff { grid-template-columns: minmax(0,1fr); } }
