@@ -1,12 +1,13 @@
-# bone-video-workshop — Bone 影视工厂
+# bone-video-workshop — 影视工厂
 
 English | [简体中文](README.zh-CN.md)
 
 An independent PI-Desktop plugin for Agent-driven visual productions
-(comic / film / promo / image), with a read-only production workbench.
+(comic / film / promo / image), with a production workbench and explicit
+revision-guarded generation brief editing.
 
 - Plugin ID: `bone.video.workshop`
-- Version: `0.21.0`
+- Version: `0.25.0`
 - License: [AGPL-3.0-only](LICENSE). This plugin stays separate from PI-Desktop's
   LGPL-3.0 repository and does not read DutyDeck production data.
 - Canonical source: `/Users/xutaoyu/CodeSource/PI-Plugins/bone-video-workshop`.
@@ -14,6 +15,42 @@ An independent PI-Desktop plugin for Agent-driven visual productions
   symlink for the host's existing development entry; it is not another copy.
   Host installations, permissions and production data remain in their original
   host-managed locations. Historical validation commands retain their old paths.
+
+## Inline references and generator handoff
+
+The actual storyboard workbench follows the approved card/table design. Open
+**操作 → 编辑镜头**, or a field shortcut, for one complete two-column editor:
+body, scale, lighting, motion, dialogue, sound effects and editorial duration.
+All five text fields support exact @ image bindings and role tabs. One atomic
+save reconciles compatibility text while preserving music, production plans and
+output history. Cancel leaves shot fields unchanged. The editor contains no image
+import or manual generation-handoff controls; its footer offers cancel, verified
+input export and save with a compact save status. Only conflicts or missing
+revision state expose reread/reconciliation controls. Media registration and
+external Agent handoff remain separate capabilities.
+
+The storyboard is one always-visible workbench. **生成输入** and **素材结果** use a
+responsive two-column layout; **制作约束**, **叙事与衔接** and **本镜质量审核** follow
+as structured fields. **本集剪辑与审核** stays on the same page with explicit episode
+ownership, and its toolbar action scrolls to that section. There are no business
+accordions or separate episode dialogs. Existing edit/save actions remain intact.
+Request preferences, project configuration, planning values, measured source
+lengths and evidence-backed reviews retain distinct meanings. Shared assets do
+not count as shot outputs, and asset adoption differs from shot adoption.
+Switching shots/views disposes sequence playback; browsing never writes data.
+
+The UI and backend share `lib/shot-authoring.js`: image inputs omit motion, speech,
+sound and timing while preserving them in storage; video inputs include applicable
+directions and distinguish editorial budget from planned source duration. Draft
+exports contain verified bytes and a draft hash; saved exports and Agent handoff
+use the backend request hash. Preparation never submits to a provider.
+See [field mapping and acceptance](docs/storyboard-port.md) and
+[reference contracts](docs/reference-handoff.md).
+
+For a standalone interaction review, open
+[shot-table-prototype.html](https://github.com/taokoplay/bone-video-workshop/blob/v0.25.0/views/shot-table-prototype.html) in the source repository. Its PNG illustrations
+and local drafts are separate from real productions; input exports include exact
+image bytes and hashes for inspection, not generated film results.
 
 ## Agent creation workflow
 
@@ -41,7 +78,7 @@ continuing a work; no direct snapshot editing is needed.
 
 Example request:
 
-> 在 Bone 影视工厂继续《星尘旅人》。先检查已有内容，补齐第一集正文、脚本节拍、
+> 在影视工厂继续《星尘旅人》。先检查已有内容，补齐第一集正文、脚本节拍、
 > 资产和分镜计划，再制作首尾帧。实际素材登记并采用后，说明影片还缺什么。
 
 ### Professional stage prompts
@@ -130,7 +167,7 @@ to support strict model callers. Exactly one adoption target is still required;
 shot revision, provenance, asset locks and host permissions remain enforced.
 Empty-string targets remain invalid. This does not alter host permission policy.
 
-### Registered tools (24)
+### Registered tools (26)
 
 | Tool | Purpose |
 |---|---|
@@ -150,6 +187,8 @@ Empty-string targets remain invalid. This does not alter host permission policy.
 | `delete_shot` | Remove a shot and its mapping/state |
 | `register_media` | Import a real workspace file into the private media library |
 | `adopt_media` | Bind registered media to one asset or one shot output kind |
+| `prepare_shot_generation` | Compile saved inline references and verify ordered images against the current shot revision |
+| `read_generation_image` | Read verified image chunks under the prepared request hash for external handoff |
 | `delete_production` | Permanently remove a work; requires explicit confirmation |
 | `record_media_inspection` | Record SHA-bound Agent-reported source length and observed usable ranges |
 | `save_edit_plan` | Save version-guarded video selections, rates, independent audio and cut notes |
@@ -336,7 +375,7 @@ Do not manually edit the host's permission registry to bypass that review.
 1. Load this folder as a development plugin, or install the `.piplug` archive.
 2. For an existing development installation, use Plugins → More → Reload and
    review the newly declared permissions.
-3. Open **Bone 影视工厂** from the work panel menu or global command search.
+3. Open **影视工厂** from the work panel menu or global command search.
 4. Ask the Agent to create or continue a work; refresh the panel to browse it.
 
 ## Validation and packaging
@@ -367,12 +406,15 @@ This checks real section switching/copy actions, keyboard access, refreshed
 content, legacy empty states, safe long-text rendering and four widths in both
 themes. Refresh always rereads the selected work after Agent updates.
 
-From the PI-Desktop repository root:
+For a release, stage only runtime files, skills, license and documentation:
 
 ```bash
-pnpm pi-plugin check /Users/xutaoyu/CodeSource/PI-Plugins/bone-video-workshop
-pnpm pi-plugin pack /Users/xutaoyu/CodeSource/PI-Plugins/bone-video-workshop
+node scripts/stage-release.cjs /path/to/empty-release-directory
 ```
+
+Run PI-Desktop **PluginCheck**, then **PluginPack**, against that staged directory
+inside the open workspace. Do not manually create `.piplug` ZIP archives. Test
+scripts, prototype/design sources, fixtures and local artifacts are excluded.
 
 The archive ships plain JS/HTML/CSS, service modules and the production skill;
 no frontend build is needed. Tests cover the registered tool chain, revision

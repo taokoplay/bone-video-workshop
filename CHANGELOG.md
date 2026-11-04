@@ -1,5 +1,32 @@
 # Changelog
 
+## 0.25.0
+
+- Integrate generation inputs, material results, production constraints,
+  narrative/continuity and quality reviews in one always-visible storyboard.
+  Episode editing and reviews stay inline with explicit episode ownership.
+- Add the complete shot editor, guarded shot creation/moves/deletion, real beat
+  selection, custom dropdowns and a nine-column table with fixed outer columns.
+- Bind @ references to exact asset/media IDs across body, lighting, motion,
+  dialogue and effects. Place the picker at the caret; filter by category/name;
+  retain pinned image versions across adoption changes.
+- Share image/video compilation between preview and host. Preserve music/plans,
+  distinguish edit budgets from source lengths, and explain excluded fields.
+  Report incompatible modes in Chinese with explicit draft-only correction actions.
+- Add read-only prepare_shot_generation/read_generation_image tools and verified
+  current/episode input downloads with exact image bytes and freshness checks.
+  Draft downloads are labeled and never masquerade as saved requests.
+- Preserve drafts on conflicts and provide reread/reconciliation only when needed.
+  Keep asset adoption, shot adoption and evidence-based review status separate.
+- Keep plugin ID, storage format and existing tools compatible. Old snapshots
+  are read without migration; new fields are additive. No generator/provider or
+  automatic final-film export is included.
+- Add persistent Node/browser regression suites for inputs, menus, revisions,
+  source provenance, playback cleanup, responsive layouts and unchanged saved data.
+
+Versions 0.22–0.24 were local development iterations, not published releases.
+See [release validation](docs/acceptance-0.25.0.md) for executed checks and limits.
+
 ## 0.21.0
 
 - Research nine public screenplay, short-drama, manju, storyboard and video skills

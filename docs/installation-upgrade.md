@@ -6,10 +6,10 @@
 
 1. Download the `.piplug` asset and `SHA256SUMS` from the repository's GitHub
    Releases page. Verify the package hash before installation, for example with
-   `shasum -a 256 bone.video.workshop-0.21.0.piplug` on macOS.
+   `shasum -a 256 bone.video.workshop-0.25.0.piplug` on macOS.
 2. In PI-Desktop plugin management, install the local package and review its
    declared permissions. Do not change the host permission registry by hand.
-3. Open **Bone 影视工厂** from the work panel menu or command search. Ask the Agent
+3. Open **影视工厂** from the work panel menu or command search. Ask the Agent
    to list productions, then open or create the intended work.
 
 Installing a plugin does not configure a media generator. Image, audio and video
@@ -47,8 +47,8 @@ restoration restores selected creative fields; it is not a full storage backup.
 
 ## Release validation limits
 
-The [v0.21.0 acceptance scope](acceptance-0.21.0.md) records the current results
-and remaining native-host and creative-media checks.
+The [v0.25.0 acceptance scope](acceptance-0.25.0.md) records the executed checks,
+compatibility guarantees and remaining native-host/provider validation limits.
 
 
 See the release notes for the exact checks executed. Registered-tool roundtrips,
@@ -61,7 +61,7 @@ voice quality, generated-video quality or final export behavior.
 ### 安装
 
 从本仓库 GitHub Releases 下载 `.piplug` 和 `SHA256SUMS`，核对文件 SHA-256 后，
-在 PI-Desktop 插件管理中安装本地包并审核权限。打开“Bone 影视工厂”，让 Agent
+在 PI-Desktop 插件管理中安装本地包并审核权限。打开“影视工厂”，让 Agent
 列出作品。安装插件不会自动配置图片、视频或声音生成服务。
 
 开发方式使用包含 `manifest.json` 的目录。更新源码后，在插件管理中使用

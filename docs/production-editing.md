@@ -88,11 +88,23 @@ separate text/planning/media/review/edit stages. Do not call unreviewed output f
 ## UI and preview
 
 Keep current project/story/script/storyboard/config tabs and dark visual language.
-Storyboard exposes planning, registered source candidates, reviews, edit selection,
-cut review and segment preview. Agent performs persistence; panel buttons copy
-precise target IDs and current revision. Show planned generation length, edit
-budget, Agent-reported source measurements, selected duration and review status
-separately. Legacy fields absent -> not yet planned/reviewed, never auto-upgrade.
+Use one always-visible, responsive workbench without business accordions or a
+separate episode dialog. Generation inputs and material results form the upper
+two columns; production constraints, narrative/continuity and shot reviews follow.
+Episode clips/audio/cut notes and episode/sequence reviews appear inline below,
+explicitly labeled with the current episode. The toolbar action scrolls/focuses
+that section in both card/table views. Disposal on shot/view/project changes
+stops and releases sequence playback.
+
+Show generationSettings request preferences with labeled defaults; project
+ratio/style/FPS inherit from actual production configuration. Show shot and
+project music directions separately when both apply. videoPlan is a planning
+strategy and does not override generationSettings or pinned @ image bindings.
+Distinguish editorial duration, requested source duration, handles, reported
+media measurements and selected clip duration. Do not invent provider parameters.
+Shared media is separate from shot-related sources; asset adoption is distinct
+from shot-output adoption. Keep one primary preview and one copy of each authored
+field/plan. Missing legacy fields remain unset; browsing never writes an upgrade.
 
 Preview uses only validated `bone.media` responses. Decode metadata and reject
 ranges beyond the actual browser duration (reported measurements may be wrong).

@@ -1,4 +1,4 @@
-/* Read-only storyboard presentation. No host calls, file access or persistence. */
+/* Storyboard presentation. Host mutations are delegated through explicit actions. */
 (() => {
   "use strict";
   const list = value => Array.isArray(value) ? value : [];
@@ -54,7 +54,7 @@
   function button(text, action, className = "vp-button") {
     const element = node("button", className, text);
     element.type = "button";
-    element.addEventListener("click", action);
+    globalThis.BoneStoryboardControls.listen(element, "click", action);
     return element;
   }
   function icon(kind) {
@@ -88,58 +88,12 @@
   }
   function prompt(doc, group, shot, action) {
     group = group || list(doc.episodes).find(ep => ep.id === shot?.episodeId);
-    return [`请用 get_production 读取 Bone 影视工厂作品 ${doc.id}《${doc.title || doc.id}》。`,
+    return [`请用 get_production 读取影视工厂作品 ${doc.id}《${doc.title || doc.id}》。`,
       group ? `当前集：${group.title}（episodeId: ${group.id || "未归属"}）。` : "当前还没有剧集。",
       shot ? `当前镜头：${shot.title || shot.id}（shotId: ${shot.id}）。` : "",
       action, "保留其他已定稿内容，不要删除作品或覆盖无关镜头。"].filter(Boolean).join("\n");
   }
 
-  function episodePicker(context, onEpisode) {
-    const picker = node("details", "bw-episode-picker");
-    const trigger = node("summary", "vp-button", context.group?.title || "尚无集数");
-    trigger.setAttribute("aria-label", "当前集数");
-    trigger.append(node("span", "", "⌄"));
-    const menu = node("div", "bw-episode-options");
-    for (const group of context.groups) {
-      const option = button(group.title, () => onEpisode(group.id), "bw-episode-option");
-      option.setAttribute("aria-current", String(group.id === context.group?.id));
-      menu.append(option);
-    }
-    if (!context.groups.length) menu.append(node("p", "vp-muted", "先让 Agent 建立剧集和脚本节拍"));
-    picker.append(trigger, menu);
-    picker.addEventListener("keydown", event => {
-      if (event.key === "Escape") { picker.open = false; trigger.focus(); }
-    });
-    picker.addEventListener("focusout", event => {
-      if (!picker.contains(event.relatedTarget)) picker.open = false;
-    });
-    return picker;
-  }
-
-  function filmPanel(snapshot, shot, slots, actions) {
-    const video = slots.find(slot => slot.kind === "video");
-    const panel = node("section", "bw-film");
-    panel.setAttribute("aria-label", "影片主窗口");
-    panel.append(heading(snapshot.document.kind === "image" ? "画面 · 主预览" : "影片 · 主预览", node("span", "bw-status", snapshot.document.kind === "image" ? slots[1].status : video.status)));
-    if (shot.videoPlan) {
-      const modes = { "text-to-video": "文生视频", "image-to-video": "当前画面驱动", "first-last-frame": "首尾帧驱动" };
-      panel.append(field("生成设计", `${modes[shot.videoPlan.mode] || shot.videoPlan.mode || "未设置"}${shot.videoPlan.rationale ? " · " + shot.videoPlan.rationale : ""}`));
-    }
-    const stage = node("div", "bw-film-stage");
-    const meta = node("div", "bw-film-meta");
-    meta.append(node("span", "", `${snapshot.document.ratio || "16:9"} · ${snapshot.document.fps || 24} FPS`), node("span", "", `成片预算 ${seconds(shot.duration)}`));
-    const slot = snapshot.document.kind === "image" ? slots[1] : video;
-    stage.append(meta);
-    if (slot.adopted) stage.append(actions.preview(slot.adopted, { title: shot.title || slot.name, zoom: slot.kind === "image" }));
-    else stage.append(empty(slot.missing ? `${slot.name}素材记录缺失` : `本镜${slot.name}尚未生成`, "先确认镜头设定，再制作、登记并采用本镜素材", slot.kind === "image" ? "image" : "film"));
-    panel.append(stage);
-    const candidates = node("details", "bw-candidates");
-    candidates.append(node("summary", "", `${slot.name}候选 · ${slot.candidates.length}`));
-    if (!slot.candidates.length) candidates.append(node("p", "vp-muted", `暂无可用${slot.name}候选`));
-    for (const candidate of slot.candidates) candidates.append(node("p", "", candidate.summary || candidate.id));
-    panel.append(candidates);
-    return panel;
-  }
 
   // Match the source workbench's frame contract; each role keeps its own slot.
   function references(snapshot, shot) {
@@ -164,13 +118,31 @@
     return result;
   }
 
-  function supportPanels(snapshot, shot, slots, actions) {
-    const support = node("div", "bw-support-grid");
-    const image = node("section", "bw-panel bw-image-reference");
-    const items = references(snapshot, shot);
-    image.append(heading("画面参考", node("span", "bw-status", `${items.length} 项`)));
+  function inputContext(snapshot, shot) {
+    const doc = snapshot.document, draft = globalThis.FilmShotAuthoring.fromShot(shot, doc);
+    const modes = { "image.generate":"文生图 · 无参考图", "image.reference":"参考图生图", "video.text":"文生视频 · 无参考图", "video.reference":"参考图生视频", "video.image":"首帧生视频", "video.first-last":"首尾帧生视频" };
+    const box = node("div", "bw-input-context"), grid = node("div", "bw-context-grid");
+    box.append(heading("请求参数", node("span", "bw-hint", shot.generationBrief ? "已保存输入" : "尚未保存生成输入")));
+    grid.append(field("请求形式", `${modes[draft.operation] || draft.operation}${shot.generationSettings?.operation ? "" : "（默认）"}`),
+      field("参考图片上限", `${draft.maxReferenceImages} 张${shot.generationSettings?.maxReferenceImages === undefined ? "（默认）" : ""}`),
+      field("项目画幅", doc.ratio), field("项目美术风格", doc.style));
+    if (draft.operation.startsWith("video.")) {
+      grid.append(field("项目帧率", doc.fps > 0 ? `${doc.fps} FPS` : "未指定"));
+      if (shot.soundDesign?.music) grid.append(field("镜头配乐指引", shot.soundDesign.music));
+      if (doc.music) grid.append(field("项目配乐指引", doc.music));
+      if (doc.voice) grid.append(field("项目人声指引", doc.voice));
+    }
+    box.append(grid, node("p", "bw-note", "请求形式和图片上限随镜头保存；画幅、风格及帧率来自项目设置。图片上限是输入约束，不代表模型能力。"));
+    if (draft.operation.startsWith("image.")) box.append(node("p", "bw-note", "本次图片请求使用画面描述、景别、光影及其图片引用；运镜、声音和时长保留用于视频制作。"));
+    return box;
+  }
+  function framePlan(snapshot, shot, actions) {
+    const image = node("section", "bw-frame-plan");
+    const items = references(snapshot, shot).filter(item => item.role === "first" || item.role === "last");
+    if (!items.length) return image;
+    image.append(heading("计划首尾帧", node("span", "bw-status", "视频制作策略")));
     const gallery = node("div", "bw-reference-gallery");
-    gallery.setAttribute("aria-label", "生成帧与画面引用");
+    gallery.setAttribute("aria-label", "计划首尾帧图片");
     for (const item of items) {
       const card = node("section", "bw-reference-card");
       card.dataset.role = item.role;
@@ -186,30 +158,31 @@
         `请按本镜设定制作${item.title}。先用 get_workflow_status 检查制作计划；用实际可用的图片工具生成到工作区 bone-media/，再 register_media。${targetAssetId ? `将图片 adopt_media 到 assetId: ${targetAssetId}；若资产已锁定先保留现状并说明。` : "将图片 adopt_media 到当前镜头 image 输出，携带当前 expectedShotRevision。"}`)), "bw-text-button"));
       gallery.append(card);
     }
-    const note = items.some(item => item.role === "last")
-      ? "首帧与尾帧分别作为镜头起止画面，与影片独立管理。"
-      : "用于构图、关键帧和视觉参考，与影片独立管理。";
-    image.append(gallery, node("p", "bw-reference-note bw-note", note));
-    const sound = node("section", "bw-panel");
-    sound.append(heading("声音设计", node("span", "bw-status", slots[2].status)),
-      field("对白 / 旁白", shot.dialogue), field("环境 / 音效", shot.soundDesign?.effects), field("配乐", shot.soundDesign?.music));
-    if (snapshot.document.music && !shot.soundDesign?.music) sound.append(node("p", "bw-note", `作品配乐方向：${snapshot.document.music}`));
-    if (slots[2].adopted) sound.append(actions.preview(slots[2].adopted, { title: "本镜独立音频" }));
-    support.append(image, sound);
-    return support;
+    image.append(gallery, node("p", "bw-note", "这里展示制作计划指定的帧资产。本次生成使用的图片仍以各字段中的 @ 绑定为准，不会自动替换引用。"));
+    return image;
   }
 
-  function inspector(snapshot, context, slots, actions) {
-    const { shot, group } = context;
-    const doc = snapshot.document;
-    const panel = node("section", "bw-panel bw-inspector");
-    panel.setAttribute("aria-label", "镜头设定");
-    const edit = button("复制修改指令", () => actions.onCopy(prompt(doc, group, shot,
-      "请先读 get_workflow_status，结合我的要求完善本镜画面、运镜、对白、时长、videoPlan（含首尾帧）、soundDesign 和 continuityPlan，再用 update_shot 带 expectedShotRevision 更新。已有计划只改需要的部分，嵌套对象要保留其他字段。")));
-    panel.append(heading("镜头设定", edit));
-    const fields = node("div", "bw-inspector-fields");
-    fields.append(field("画面描述", shot.scene), field("运镜与表演", shot.motion), field("对白", shot.dialogue));
-    if (shot.continuityPlan) fields.append(field("入场状态", shot.continuityPlan.entryState), field("出场状态", shot.continuityPlan.exitState));
+  function narrativeContext(snapshot, context, actions) {
+    const { shot, group } = context, doc = snapshot.document;
+    const panel = node("section", "bw-panel bw-narrative-context"); panel.setAttribute("aria-label", "叙事与衔接");
+    const edit = button("复制计划修改指令", () => actions.onCopy(prompt(doc, group, shot,
+      "请先读 get_workflow_status，核对本镜 videoPlan、continuityPlan 与 productionPlan，并核对 generationSettings.operation 的本次请求形式。只修改我指定的计划字段，用 update_shot 带 expectedShotRevision 保存；保留正文引用、音乐和无关字段。")));
+    panel.append(heading("叙事与衔接", edit));
+    const fields = node("div", "bw-context-grid");
+    if (shot.videoPlan) {
+      const modes = { "text-to-video":"文生视频", "image-to-video":"采用画面驱动", "first-last-frame":"首尾帧驱动" };
+      const transitions = { "hard-cut":"硬切", "match-cut":"匹配剪辑", dissolve:"叠化" };
+      fields.append(field("视频制作策略", modes[shot.videoPlan.mode] || shot.videoPlan.mode), field("策略依据", shot.videoPlan.rationale), field("入场转场计划", transitions[shot.videoPlan.transitionIn] || shot.videoPlan.transitionIn));
+    }
+    if (shot.continuityPlan) {
+      const plan = shot.continuityPlan;
+      const audio = { "hard-cut":"直接切换", "carry-over":"声音延续", prelap:"声音先入", "dialogue-carry":"对白跨镜" };
+      fields.append(field("入场状态", plan.entryState), field("出场状态", plan.exitState), field("衔接依据", plan.rationale), field("声音衔接计划", audio[plan.audioTransition] || plan.audioTransition));
+      for (const anchor of list(plan.anchors)) {
+        const asset = list(doc.assets).find(item => item.id === anchor.assetId);
+        fields.append(field(`连续性锚点 · ${anchor.phase}`, `${anchor.state}${asset ? ` · ${asset.name}` : ""}`));
+      }
+    }
     const beat = list(group?.episode?.script?.beats).find(item => list(item.shotIds).includes(shot.id));
     const mapping = node("section", "bw-field");
     mapping.append(node("h4", "", "所属脚本节拍"));
@@ -217,19 +190,12 @@
     else mapping.append(node("p", "", "尚未映射到脚本节拍"));
     fields.append(mapping);
     panel.append(fields);
-    const output = node("section", "bw-output-list");
-    output.append(heading("本镜输出", node("span", "vp-muted", "独立确认")));
-    for (const slot of slots) {
-      const row = node("div", "bw-output-row");
-      row.append(node("span", "", slot.name), node("span", "bw-status", slot.status));
-      output.append(row);
-    }
-    output.append(node("p", "bw-note", "影片、画面和声音分别管理，静帧不会被标记为影片。"));
-    panel.append(output);
     const assets = node("section", "bw-assets");
-    assets.append(heading("引用资产", node("span", "vp-muted", `${list(shot.assetIds).length} 项`)));
+    const draft = globalThis.FilmShotAuthoring.fromShot(shot, doc);
+    const assetIds = [...new Set([...list(shot.assetIds), ...globalThis.FilmShotAuthoring.FIELDS.flatMap(key => list(draft[key]?.nodes).filter(item => item.type === "reference").map(item => item.assetId))])];
+    assets.append(heading("引用资产", node("span", "vp-muted", `${assetIds.length} 项`)));
     const links = node("div", "bw-asset-links");
-    for (const id of list(shot.assetIds)) {
+    for (const id of assetIds) {
       const asset = list(doc.assets).find(item => item.id === id);
       const link = button(asset ? `${asset.name || id}${asset.locked ? " · 已锁定" : ""}` : "资产不可用", () => actions.onAsset(asset), "vp-button");
       link.disabled = !asset;
@@ -237,77 +203,18 @@
       links.append(link);
     }
     assets.append(links);
-    if (!list(shot.assetIds).length) assets.append(node("p", "bw-note", "尚未引用资产"));
+    if (!assetIds.length) assets.append(node("p", "bw-note", "尚未引用资产"));
     panel.append(assets);
-    const state = snapshot.shotStates?.[shot.id];
-    const footer = node("div", "bw-inspector-footer");
-    footer.append(node("span", "vp-muted", `设定 v${state?.revision ?? 0} · 输出 v${state?.outputVersion ?? 0}${state?.needsUpdate ? " · 待更新" : ""}`),
-      button("复制镜头 ID", () => actions.onCopy(shot.id)));
-    panel.append(footer);
+    panel.append(button("复制镜头 ID", () => actions.onCopy(shot.id), "bw-text-button"));
     return panel;
   }
 
-  function render(snapshot, context, actions) {
-    const { document: doc } = snapshot;
-    const { group, shots, shot } = context;
-    const page = node("div", "bw-storyboard");
-    page.setAttribute("aria-label", "分镜工作台");
-    const toolbar = node("div", "bw-toolbar");
-    toolbar.append(episodePicker(context, actions.onEpisode), node("span", "vp-muted", `${shots.length} 个镜头 · 预算 ${seconds(shots.reduce((sum, item) => sum + (Number(item.duration) || 0), 0))}`),
-      button("复制新增指令", () => actions.onCopy(prompt(doc, group, null,
-        "请先检查本集的脚本节拍；缺少节拍时先补齐，再用 add_shots 为本集拆分镜头，每个镜头必须带对应 beatId。"))));
-    page.append(toolbar);
-    const layout = node("div", "bw-layout");
-    const sidebar = node("aside", "bw-sidebar");
-    sidebar.setAttribute("aria-label", "镜头序列");
-    sidebar.append(node("span", "bw-eyebrow", "STORYBOARD"), heading("镜头序列", node("span", "vp-muted", String(shots.length).padStart(2, "0"))));
-    const strip = node("div", "bw-shot-list");
-    strip.setAttribute("role", "group");
-    strip.setAttribute("aria-label", "分镜序列");
-    shots.forEach((item, index) => {
-      const slots = outputs(snapshot, item);
-      const status = snapshot.shotStates?.[item.id]?.needsUpdate ? "待更新" : slots[0].adopted ? "影片已采用" : slots[1].adopted ? "画面已采用" : "文字已保存";
-      const card = button("", () => actions.onShot(item.id), "bw-shot");
-      card.dataset.shotId = item.id;
-      card.setAttribute("aria-pressed", String(shot?.id === item.id));
-      card.setAttribute("aria-label", `镜头 ${index + 1}，${item.title || "未命名镜头"}，${seconds(item.duration)}，${status}`);
-      const preview = node("div", "bw-thumbnail");
-      if (slots[1].adopted) preview.append(actions.preview(slots[1].adopted, { title: item.title || "镜头画面" }));
-      else preview.append(icon("film"));
-      preview.append(node("span", "bw-shot-number", String(index + 1).padStart(2, "0")), node("span", "bw-shot-duration", seconds(item.duration)));
-      card.append(preview, node("strong", "bw-shot-title", item.title || "未命名镜头"), node("span", "bw-status", status));
-      strip.append(card);
-    });
-    if (!shots.length) strip.append(node("p", "bw-note", "本集尚无镜头"));
-    sidebar.append(strip, node("p", "bw-sidebar-foot", "影片 · 画面 · 声音"));
-    const main = node("div", "bw-main");
-    if (!shot) {
-      main.append(empty(group ? "这一集还没有分镜" : "先建立剧集和脚本", "让 Agent 按脚本节拍拆镜头，完成后刷新查看。"));
-      if (group?.episode) main.append(button("查看本集脚本", () => actions.onBeat(null)));
-    } else {
-      const index = shots.indexOf(shot);
-      const head = node("header", "bw-current-heading");
-      const copy = node("div", "bw-current-copy");
-      copy.append(node("span", "vp-muted", `当前镜头 · 成片预算 ${seconds(shot.duration)}`), node("h2", "", shot.title || "未命名镜头"));
-      const navigation = node("nav", "bw-navigation");
-      navigation.setAttribute("aria-label", "切换镜头");
-      const previous = button("‹", () => actions.onShot(shots[index - 1].id));
-      previous.setAttribute("aria-label", "上一镜头"); previous.disabled = index === 0;
-      const next = button("›", () => actions.onShot(shots[index + 1].id));
-      next.setAttribute("aria-label", "下一镜头"); next.disabled = index === shots.length - 1;
-      navigation.append(previous, node("span", "vp-muted", `${index + 1} / ${shots.length}`), next);
-      head.append(node("span", "bw-current-index", String(index + 1).padStart(2, "0")), copy, navigation);
-      const slots = outputs(snapshot, shot);
-      main.append(head, filmPanel(snapshot, shot, slots, actions), supportPanels(snapshot, shot, slots, actions));
-      const footer = node("div", "bw-main-footer");
-      footer.append(node("span", "vp-muted", `镜头 ${index + 1} / ${shots.length} · 影片、画面分别确认`),
-        button("复制给 Agent", () => actions.onCopy(prompt(doc, group, shot, "先用 get_workflow_status 检查本镜缺口，依次完善计划、首尾帧素材和输出。实际生成后必须 register_media，再 adopt_media；若没有视频生成工具，请说明并支持导入已有影片，不要把静帧称为影片。"))));
-      main.append(footer, inspector(snapshot, context, slots, actions));
-    }
-    if (globalThis.BoneEditorial) main.append(globalThis.BoneEditorial.render(snapshot, actions.editorial, context, actions));
-    layout.append(sidebar, main); page.append(layout);
-    return page;
-  }
 
-  globalThis.BoneStoryboard = Object.freeze({ selection, outputs, references, render });
+  function render(snapshot, context, actions) {
+    return globalThis.BoneStoryboardSurface.render(snapshot, context, actions,
+      { outputs, references, icon, seconds, empty, prompt, inputContext, framePlan, narrativeContext });
+  }
+  function beginRender() { globalThis.BoneStoryboardControls?.beginRender(); }
+
+  globalThis.BoneStoryboard = Object.freeze({ selection, outputs, references, render, beginRender });
 })();

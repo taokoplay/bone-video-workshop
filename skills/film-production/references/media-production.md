@@ -14,6 +14,55 @@ reference identities, request scope, output count and acceptance criteria in
 the episode companion document. Use real returned media hashes where available.
 An intended instruction is not evidence that generation ran or passed review.
 
+### Inline references and verified image handoff
+
+Save the exact generation wording in the shot's `generationBrief` document:
+`{schemaVersion:1,nodes:[{type:"text",text:"Follow "},
+{type:"reference",assetId:"<real asset ID>",mediaId:"<real associated image ID>",
+role:"identity"}]}`. Use actual IDs and explicit roles: identity, scene, prop,
+style, first-frame or last-frame. Add reference assets to shot.assetIds without
+removing unrelated assets. Plain names do not bind images; unresolved @ text
+blocks preparation. Changing scene with a retained brief requires explicitly
+resubmitting the revalidated brief or clearing it in the same update.
+
+Lighting, motion, dialogue and effects may additionally carry documents in
+`referenceFields.lighting/motion/dialogue/effects`. These documents are authoritative;
+plain-field updates must explicitly reconcile or remove the corresponding document.
+Do not put scale/lighting inside productionPlan. Sound effects belong to
+soundDesign.effects; preserve soundDesign.music. Current adoption and explicit
+asset.referenceMediaIds are valid pinned associations; never switch to a newer
+image automatically. Source-shot provenance must still be current.
+
+Image inputs use body, scale, lighting, project ratio/style and their references.
+Video inputs also include applicable motion, dialogue, effects and audio directions.
+Respect compiled.omittedFields: saved content may not apply to this operation.
+parameters.editDurationSeconds is an editorial budget, while
+parameters.requestedDurationSeconds is an explicitly planned source length.
+Never infer the latter from the former or treat maxReferenceImages as a discovered
+provider capability. Draft input packages are marked saved:false and carry
+inputHash/base revisions, not an executable backend requestHash; save/reconcile
+before using the prepared Agent handoff sequence below.
+
+Call `prepare_shot_generation` with id, shotId, current expectedShotRevision,
+operation and optional maxReferenceImages (1..8). Operations image.generate and
+video.text accept no images; image.reference/video.reference accept explicit
+references; video.image requires one first-frame image; video.first-last requires
+distinct first/last images. Unsupported inputs fail instead of being dropped.
+The result contains `compiled`, productionRevision, shotRevision and requestHash.
+
+Use `read_generation_image` with the same request arguments and requestHash,
+1-based slot, integer offset and length (1..65536 bytes). Decode each base64
+chunk, assemble in slot order, and verify the complete byte length and SHA-256.
+Reprepare and require the same hash before external handoff. Pass the exact
+compiled prompt and verified images as files/data URLs to the actual authorized
+generation tool. Never substitute an invented path or a text-only reference.
+Abort on any failed read or stale revision and reconcile the saved brief.
+
+These tools only prepare and read inputs; they neither submit paid generation
+nor certify success. Register/adopt only actual returned output, keeping its
+captured revision. Full limits, precedence and error contracts are documented in
+`docs/reference-handoff.md`.
+
 ## A. First-frame / last-frame image prompt
 
 Act as the frame art director. Describe one precise instant:

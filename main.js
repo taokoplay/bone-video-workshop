@@ -1,5 +1,5 @@
 /**
- * Bone 影视工厂 (bone.video.workshop) — PI-Desktop plugin entry.
+ * Film Factory (bone.video.workshop) — PI-Desktop plugin entry.
  *
  * Agent-first creation flow: productions are created and written by the
  * Agent through registered tools, stored in the plugin's private data path
@@ -22,6 +22,10 @@ const { projectBibleSchema, validateProjectBible } = require("./lib/project-bibl
 const { assetDetailSchemas, assetDetailPatch } = require("./lib/asset-details.js");
 const { createEditorialService } = require("./lib/editing-service.js");
 const { createRevisionService, publicRevisionPlan } = require("./lib/revision-service.js");
+const { generationBriefSchema } = require("./lib/generation-brief.js");
+const { authoringSchemas, checkShotFields, checkAuthoringChange, applyAuthoringFields, validateAtomicPatch } = require("./lib/shot-authoring-fields.js");
+const { createShotPanel, checkProductionRevision } = require("./lib/shot-panel.js");
+const { createGenerationService } = require("./lib/generation-service.js");
 
 const COMMAND_ID = "bone.video.workshop.open";
 const VIEW_ID = "workshop";
@@ -474,12 +478,17 @@ async function toolAddAssets(args) {
   });
 }
 
-async function toolAddShots(args) {
+async function toolAddShots(args, strict = false) {
+  const schema = TOOL_DEFS.find(tool => tool.name === "add_shots").schema;
+  checkShotFields(args, schema.properties);
+  if (Array.isArray(args.shots)) for (const shot of args.shots) checkShotFields(shot, schema.properties.shots.items.properties);
+  args = structuredClone(args);
   const id = str(args?.id);
   const input = Array.isArray(args?.shots) ? args.shots : [];
   if (!input.length) throw fail("INVALID_ARGUMENT", "shots must be a non-empty array");
   const wantedEpisode = str(args?.episodeId);
   return mutateProduction(id, (snapshot) => {
+    checkProductionRevision(snapshot, args);
     const doc = snapshot.document;
     if (doc.shots.length + input.length > LIMITS.maxShots) {
       throw fail("LIMIT_EXCEEDED", `at most ${LIMITS.maxShots} shots per production`);
@@ -499,7 +508,7 @@ async function toolAddShots(args) {
     const added = [];
     for (const raw of input.slice(0, LIMITS.maxShotsPerCall)) {
       const title = str(raw?.title);
-      const scene = str(raw?.scene);
+      const scene = strict ? raw.scene : str(raw?.scene);
       if (!title || !scene) throw fail("INVALID_ARGUMENT", "every shot needs title and scene");
       let duration = Number(raw?.duration);
       if (!Number.isFinite(duration) || duration < 0) duration = defaultDuration;
@@ -533,13 +542,16 @@ async function toolAddShots(args) {
         title: title.slice(0, LIMITS.maxShotTitle),
         duration,
         scene: scene.slice(0, LIMITS.maxTextField),
-        motion: str(raw?.motion).slice(0, LIMITS.maxTextField),
-        dialogue: str(raw?.dialogue).slice(0, LIMITS.maxTextField),
+        motion: strict ? raw.motion ?? "" : str(raw?.motion).slice(0, LIMITS.maxTextField),
+        dialogue: strict ? raw.dialogue ?? "" : str(raw?.dialogue).slice(0, LIMITS.maxTextField),
         assetIds: assetIds.filter((assetId) => knownAssets.has(assetId)),
         mediaId: null,
         outputs: { image: null, video: null, audio: null },
       };
+      if (strict && unknownAssets.size) throw fail("NOT_FOUND", "Shot asset not found");
+      applyAuthoringFields(shot, raw, doc);
       applyPlans(shot, raw, doc);
+      if (strict && raw.soundDesign) shot.soundDesign = structuredClone(raw.soundDesign);
       doc.shots.push(shot);
       snapshot.shotStates[shot.id] = { revision: 1, outputVersion: 0, needsUpdate: false };
       const targetBeat = beatOrFail(ownerEpisode, beatId);
@@ -633,7 +645,9 @@ function shotOrFail(doc, shotId) {
    });
  }
 
- async function toolUpdateShot(args) {
+ async function toolUpdateShot(args, atomic = false, strict = false) {
+   checkShotFields(args, TOOL_DEFS.find(tool => tool.name === "update_shot").schema.properties);
+   args = structuredClone(args);
    const id = str(args?.id);
    const shotId = str(args?.shotId);
    if (!shotId) throw fail("INVALID_ARGUMENT", "shotId is required");
@@ -644,12 +658,12 @@ function shotOrFail(doc, shotId) {
      patch.title = title.slice(0, LIMITS.maxShotTitle);
    }
    if (args?.scene !== undefined) {
-     const scene = str(args.scene);
+     const scene = strict ? args.scene : str(args.scene);
      if (!scene) throw fail("INVALID_ARGUMENT", "shot scene cannot be empty");
      patch.scene = scene.slice(0, LIMITS.maxTextField);
    }
-   if (args?.motion !== undefined) patch.motion = str(args.motion).slice(0, LIMITS.maxTextField);
-   if (args?.dialogue !== undefined) patch.dialogue = str(args.dialogue).slice(0, LIMITS.maxTextField);
+   if (args?.motion !== undefined) patch.motion = strict ? args.motion : str(args.motion).slice(0, LIMITS.maxTextField);
+   if (args?.dialogue !== undefined) patch.dialogue = strict ? args.dialogue : str(args.dialogue).slice(0, LIMITS.maxTextField);
    if (args?.duration !== undefined) {
      const duration = Number(args.duration);
      if (!Number.isFinite(duration) || duration < 0) throw fail("INVALID_ARGUMENT", "duration must be >= 0");
@@ -658,7 +672,9 @@ function shotOrFail(doc, shotId) {
    const hasAssetIds = args?.assetIds !== undefined;
    const hasEpisodeId = args?.episodeId !== undefined;
    const changedPlans = Object.keys(planSchemas).filter(key => args?.[key] !== undefined);
-   if (!Object.keys(patch).length && !changedPlans.length && !hasAssetIds && !hasEpisodeId && args?.beatId === undefined) {
+   const hasBrief = args?.generationBrief !== undefined;
+   const changedAuthoring = Object.keys(authoringSchemas).filter(key => args?.[key] !== undefined);
+   if (!Object.keys(patch).length && !changedPlans.length && !hasBrief && !changedAuthoring.length && !hasAssetIds && !hasEpisodeId && args?.beatId === undefined) {
      throw fail("INVALID_ARGUMENT", "provide at least one field to update");
    }
    return mutateProduction(id, (snapshot) => {
@@ -667,6 +683,8 @@ function shotOrFail(doc, shotId) {
      if (args?.expectedShotRevision !== undefined && args.expectedShotRevision !== snapshot.shotStates[shotId]?.revision) {
        throw fail("CONFLICT", "shot changed; read get_production again before updating");
      }
+     if (atomic) validateAtomicPatch(args, shot, doc);
+     checkAuthoringChange(shot, { ...args, ...patch });
      const unknownAssets = [];
      if (hasEpisodeId) {
        const episodeId = str(args.episodeId);
@@ -693,13 +711,16 @@ function shotOrFail(doc, shotId) {
        for (const assetId of wanted) if (!known.has(assetId)) unknownAssets.push(assetId);
        shot.assetIds = wanted.filter((assetId) => known.has(assetId));
      }
+     if (strict && unknownAssets.length) throw fail("NOT_FOUND", "Shot asset not found");
      Object.assign(shot, patch);
+     applyAuthoringFields(shot, args, doc);
      if (changedPlans.length || hasAssetIds) applyPlans(shot, args, doc);
+     if (strict && args.soundDesign) shot.soundDesign = structuredClone(args.soundDesign);
      markShotDirty(snapshot, shotId);
      const result = {
        id: doc.id,
        shotId,
-       changed: [...Object.keys(patch), ...changedPlans, ...(hasAssetIds ? ["assetIds"] : []), ...(hasEpisodeId ? ["episodeId"] : []), ...(args?.beatId !== undefined ? ["beatId"] : [])],
+       changed: [...Object.keys(patch), ...changedPlans, ...changedAuthoring, ...(hasBrief ? ["generationBrief"] : []), ...(hasAssetIds ? ["assetIds"] : []), ...(hasEpisodeId ? ["episodeId"] : []), ...(args?.beatId !== undefined ? ["beatId"] : [])],
        shotRevision: snapshot.shotStates[shotId].revision,
        needsUpdate: true,
      };
@@ -711,10 +732,15 @@ function shotOrFail(doc, shotId) {
  }
 
  async function toolDeleteShot(args) {
+   args = structuredClone(args);
    const id = str(args?.id);
    const shotId = str(args?.shotId);
    if (!shotId) throw fail("INVALID_ARGUMENT", "shotId is required");
    return mutateProduction(id, (snapshot) => {
+     checkProductionRevision(snapshot, args);
+     if (args.expectedShotRevision !== undefined && args.expectedShotRevision !== snapshot.shotStates?.[shotId]?.revision) {
+       throw fail("CONFLICT", "Shot revision changed");
+     }
      const doc = snapshot.document;
      const index = doc.shots.findIndex((item) => item.id === shotId);
      if (index < 0) throw fail("NOT_FOUND", `shot not found: ${shotId}`);
@@ -726,12 +752,14 @@ function shotOrFail(doc, shotId) {
  }
 
  async function toolMoveShot(args) {
+   args = structuredClone(args);
    const id = str(args?.id);
    const shotId = str(args?.shotId);
    if (!shotId) throw fail("INVALID_ARGUMENT", "shotId is required");
    const toIndex = Number(args?.toIndex);
    if (!Number.isInteger(toIndex)) throw fail("INVALID_ARGUMENT", "toIndex must be an integer (0-based)");
    return mutateProduction(id, (snapshot) => {
+     checkProductionRevision(snapshot, args);
      const doc = snapshot.document;
      const from = doc.shots.findIndex((item) => item.id === shotId);
      if (from < 0) throw fail("NOT_FOUND", `shot not found: ${shotId}`);
@@ -769,7 +797,7 @@ function shotOrFail(doc, shotId) {
      const asset = assetOrFail(doc, assetId);
      Object.assign(asset, patch);
      // Asset settings constrain every shot that references them.
-     const affected = doc.shots.filter((shot) => (shot.assetIds || []).includes(assetId));
+     const affected = doc.shots.filter((shot) => (shot.assetIds || []).includes(assetId) || referencedAssets(shot).includes(assetId));
      for (const shot of affected) markShotDirty(snapshot, shot.id);
      return { id: doc.id, assetId, changed, shotsAffected: affected.length };
    });
@@ -820,15 +848,19 @@ const mediaService = createMediaService({
 });
 const editorialService = createEditorialService({ readSnapshot, mutateProduction, newId });
 const revisionService = createRevisionService({ readSnapshot, mutateProduction, newId, markShotDirty });
+const generationService = createGenerationService({ readSnapshot, mediaService, updateShot: args => toolUpdateShot(args, true, true) });
+const shotPanel = createShotPanel({ getTools: () => TOOL_DEFS, add: args => toolAddShots(args, true),
+  update: args => toolUpdateShot(args, false, true), move: toolMoveShot, deleteShot: toolDeleteShot });
 
 const TOOL_DEFS = [
   ...mediaService.tools,
+  ...generationService.tools,
   ...editorialService.tools,
   ...revisionService.tools,
   workflowTool(readSnapshot),
   {
     name: "list_productions",
-    description: "列出 Bone 影视工厂中的全部影像作品（标题、类型、集数、镜头数、更新时间）。",
+    description: "列出影视工厂中的全部影像作品（标题、类型、集数、镜头数、更新时间）。",
     risk: "low",
     schema: { type: "object", properties: {}, additionalProperties: false },
     execute: async () => toolListProductions(),
@@ -989,6 +1021,7 @@ const TOOL_DEFS = [
       properties: {
         id: { type: "string", description: "作品 id" },
         episodeId: { type: "string", description: "可选：归属的剧集 id" },
+        expectedProductionRevision: { type: "integer", minimum: 1, maximum: Number.MAX_SAFE_INTEGER },
         shots: {
           type: "array",
           minItems: 1,
@@ -1004,6 +1037,8 @@ const TOOL_DEFS = [
               assetIds: { type: "array", items: { type: "string" } },
               beatId: { type: "string", description: "必填：本集某个叙事节拍的 id（先用 write_episodes 写节拍）" },
               ...planSchemas,
+              generationBrief: generationBriefSchema,
+              ...authoringSchemas,
             },
             required: ["title", "scene", "beatId"],
             additionalProperties: false,
@@ -1058,6 +1093,8 @@ const TOOL_DEFS = [
          beatId: { type: "string", description: "改映射的叙事节拍；不可为空（镜头必须属于一个节拍）" },
          expectedShotRevision: { type: "integer", minimum: 1, description: "可选乐观锁：get_production 返回的 shotStates[shotId].revision" },
          ...planSchemas,
+         generationBrief: generationBriefSchema,
+         ...authoringSchemas,
        },
        required: ["id", "shotId"],
        additionalProperties: false,
@@ -1073,6 +1110,8 @@ const TOOL_DEFS = [
        properties: {
          id: { type: "string", description: "作品 id" },
          shotId: { type: "string", description: "镜头 id" },
+         expectedProductionRevision: { type: "integer", minimum: 1, maximum: Number.MAX_SAFE_INTEGER },
+         expectedShotRevision: { type: "integer", minimum: 1, maximum: Number.MAX_SAFE_INTEGER },
        },
        required: ["id", "shotId"],
        additionalProperties: false,
@@ -1089,6 +1128,7 @@ const TOOL_DEFS = [
          id: { type: "string", description: "作品 id" },
          shotId: { type: "string", description: "要移动的镜头 id" },
          toIndex: { type: "number", description: "目标位置，0-based" },
+         expectedProductionRevision: { type: "integer", minimum: 1, maximum: Number.MAX_SAFE_INTEGER },
        },
        required: ["id", "shotId", "toIndex"],
        additionalProperties: false,
@@ -1195,7 +1235,7 @@ async function onLoad() {
 
   await pi.commands.register({
     id: COMMAND_ID,
-    title: "Bone 影视工厂: 打开工作台",
+    title: "影视工厂: 打开工作台",
     keywords: ["bone", "video", "影视", "workshop"],
     run: async () => {
       await pi.ui.revealView({ viewId: VIEW_ID });
@@ -1217,7 +1257,7 @@ async function onLoad() {
   capabilities.agentAvailable = typeof pi.agent?.registerTool === "function";
   if (!capabilities.agentAvailable) {
     capabilities.errors.push(
-      "agent 能力不可用：manifest 声明了 agent.tool.register，需要在 Plugins 页对「Bone 影视工厂」执行 More → Reload 并同意新增权限",
+      "agent 能力不可用：manifest 声明了 agent.tool.register，需要在 Plugins 页对「影视工厂」执行 More → Reload 并同意新增权限",
     );
     return;
   }
@@ -1252,6 +1292,12 @@ async function onUnload() {
 
 // Panel bridge: the view reads and writes storage through these channels only.
 async function onPanelInvoke(channel, payload) {
+  // Generation reads finish with a fresh revision check; do not await tracing afterward.
+  if (channel === "bone.generation.save") return generationService.saveDraft(payload);
+  if (channel === "bone.generation.prepare") return generationService.prepare(payload);
+  if (channel === "bone.generation.read-image") return generationService.readImage(payload);
+  if (channel === "bone.generation.import-image") return mediaService.importImage(payload);
+  if (["bone.shot.update", "bone.shot.add", "bone.shot.move", "bone.shot.delete"].includes(channel)) return shotPanel(channel, payload);
   const at = new Date().toISOString();
   try {
     const result = await handlePanelChannel(channel, payload);

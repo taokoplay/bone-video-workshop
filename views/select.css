@@ -1,0 +1,16 @@
+/* Neutral workbench combobox; both trigger and options are custom HTML. */
+.bw-select { display:inline-flex; align-items:center; justify-content:space-between; gap:12px; min-width:0; min-height:34px; max-width:100%; padding:7px 9px; border:1px solid #505050; border-radius:6px; background:#202020; color:#e8e8e8; font:inherit; font-size:12px; line-height:18px; text-align:left; cursor:pointer; }
+.bw-select:hover:not(:disabled) { border-color:#707070; background:#262626; }
+.bw-select[aria-expanded=true] { border-color:#8d8d8d; background:#303030; }
+.bw-select:focus-visible { outline:2px solid #9cbbdf; outline-offset:2px; }
+.bw-select:disabled { cursor:default; opacity:.45; }
+.bw-select-value { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.bw-select-chevron,.bw-select-check { display:block; flex:none; width:14px; height:14px; }
+.bw-select-chevron { color:#a2a2a2; }
+.bw-select[aria-expanded=true] .bw-select-chevron { transform:rotate(180deg); color:#e8e8e8; }
+.bw-select-menu { position:fixed; inset:auto; box-sizing:border-box; margin:0; padding:5px; max-height:280px; overflow:auto; overscroll-behavior:contain; border:1px solid #555; border-radius:7px; background:#303030; color:#e8e8e8; box-shadow:0 10px 24px #0007; font:12px/1.5 -apple-system,BlinkMacSystemFont,"SF Pro Text","PingFang SC","Microsoft YaHei",sans-serif; }
+.bw-select-option { display:flex; align-items:center; justify-content:space-between; gap:14px; min-height:32px; padding:7px 9px; border-radius:4px; cursor:pointer; overflow-wrap:anywhere; }
+.bw-select-option[data-active=true] { background:#444; }
+.bw-select-option[aria-selected=true] { color:#c1d9e7; }
+.bw-select-option .bw-select-check { visibility:hidden; }
+.bw-select-option[aria-selected=true] .bw-select-check { visibility:visible; }

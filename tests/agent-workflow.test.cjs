@@ -120,7 +120,7 @@ test("new plans can be supplied at creation and old no-plan snapshots remain rea
 
 test("manifest advertises all runtime schemas, scoped file reads and the production skill", async () => {
   const manifest = JSON.parse(await fs.readFile(path.join(__dirname, "../manifest.json"), "utf8"));
-  assert.equal(tools.size, 24);
+  assert.equal(tools.size, 26);
   for (const descriptor of manifest.contributes.agentTools) {
     const tool = tools.get(descriptor.name);
     assert.deepEqual(tool.schema, descriptor.schema);
