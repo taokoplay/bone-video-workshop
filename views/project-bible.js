@@ -21,7 +21,7 @@
   }
   function prompt(doc, section) {
     const field = section.key === "arc" ? "arc" : `projectBible.${section.key}`;
-    return `请${textFor(doc, section.key).trim() ? "审阅并完善" : "补充"} Bone 影视工厂作品《${doc.title || doc.id}》（${doc.id}）的「${section.label}」。先用 get_production 读取已有项目设定、全剧主线和分集正文，遵循项目开发专业提示词。${section.hint} 区分已确定事实、提议与未知项，不自行改动其他栏目或已定稿内容。使用 update_production 将完整内容保存到 ${field}；projectBible 只传本次修改的栏目，不用空字符串占位其他栏目。保存后回读，说明对相关集数或镜头的影响；不要只在对话中给出梗概。`;
+    return `请${textFor(doc, section.key).trim() ? "审阅并完善" : "补充"}影视工厂作品《${doc.title || doc.id}》（${doc.id}）的「${section.label}」。先用 get_production 读取已有项目设定、全剧主线和分集正文，遵循项目开发专业提示词。${section.hint} 区分已确定事实、提议与未知项，不自行改动其他栏目或已定稿内容。使用 update_production 将完整内容保存到 ${field}；projectBible 只传本次修改的栏目，不用空字符串占位其他栏目。保存后回读，说明对相关集数或镜头的影响；不要只在对话中给出梗概。`;
   }
   function render(doc, { copyText }) {
     const prefix = `bone-bible-${++instance}`;

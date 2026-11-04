@@ -1,6 +1,6 @@
 ---
 name: film-production
-description: "Develop and review Bone 影视工厂 works: complete screenplays, manju, storyboards, edit handles and evidence reviews; stage scoped rewrite plans before authorized application. Use for 剧本、漫剧、分镜、评审、改写、剪辑 and 修订 in Bone."
+description: "Develop and review 影视工厂 works: complete screenplays, manju, storyboards, edit handles and evidence reviews; stage scoped rewrite plans before authorized application. Use for 剧本、漫剧、分镜、评审、改写、剪辑 and 修订."
 ---
 
 # Bone film production

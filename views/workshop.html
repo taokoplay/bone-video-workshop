@@ -5,8 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="pi-plugin-chrome" content="v2" />
     <!-- bone-build 由 regen-manifest.mjs 从 manifest.version 写入：面板据此判断自己是不是旧文档。 -->
-    <meta name="bone-build" content="0.21.0" />
-    <title>Bone 影视工厂</title>
+    <meta name="bone-build" content="0.25.0" />
+    <title>影视工厂</title>
     <style>
       /* Visual-production design tokens (light and dark), mapped from the
          original prototype palette to the hsl variable names the vp-*
@@ -407,16 +407,19 @@
 
     </style>
     <link rel="stylesheet" href="./storyboard.css" />
+    <link rel="stylesheet" href="./select.css" />
+    <link rel="stylesheet" href="./generation-panel.css" />
     <link rel="stylesheet" href="./project-bible.css" />
     <link rel="stylesheet" href="./editorial.css" />
     <link rel="stylesheet" href="./revisions.css" />
+    <link rel="stylesheet" href="./shot-workbench.css" />
   </head>
   <body>
     <div class="vp-workspace">
       <div class="vp-top">
         <div class="vp-top-heading">
           <div class="vp-brand-row">
-            <span class="vp-brand"><em>Bone</em> 影视工厂</span>
+            <span class="vp-brand">影视工厂</span>
             <span class="vp-version" id="topVersion" hidden></span>
           </div>
           <strong id="topTitle">尚未创建作品</strong>
@@ -549,6 +552,15 @@
     <script src="./sequence-preview.js"></script>
     <script src="./editorial.js"></script>
     <script src="./revisions.js"></script>
+    <script src="../lib/reference-document.js"></script>
+    <script src="../lib/shot-authoring.js"></script>
+    <script src="./reference-editor.js"></script>
+    <script src="./generation-inputs.js"></script>
+    <script src="./select.js"></script>
+    <script src="./generation-panel.js"></script>
+    <script src="./storyboard-controls.js"></script>
+    <script src="./storyboard-references.js"></script>
+    <script src="./storyboard-surface.js"></script>
     <script src="./storyboard.js"></script>
     <script src="./project-bible.js"></script>
     <script src="./asset-details.js"></script>
@@ -664,7 +676,7 @@
        // 给 Agent 的续写指令：只描述现状与缺口，不替 Agent 编内容。
        function buildAgentPrompt(doc, shots, stale) {
          const lines = [
-           `继续完善 Bone 影视工厂里的作品 ${doc.id}《${doc.title}》（${KIND_LABELS[doc.kind] || doc.kind}）。`,
+           `继续完善影视工厂里的作品 ${doc.id}《${doc.title}》（${KIND_LABELS[doc.kind] || doc.kind}）。`,
          ];
          const episodes = Array.isArray(doc.episodes) ? doc.episodes : [];
          const assets = Array.isArray(doc.assets) ? doc.assets : [];
@@ -776,7 +788,7 @@
         copy.appendChild(el("strong", null, title));
         const hint = el("p", null, "当前插件版本 ");
         hint.appendChild(el("code", null, status.version || "unknown"));
-        hint.append("：请在 Plugins 页对「Bone 影视工厂」执行 More → Reload，并同意新增权限（agent.tool.register）。在此之前，对话里的 Agent 调不到创建/写入工具。");
+        hint.append("：请在 Plugins 页对「影视工厂」执行 More → Reload，并同意新增权限（agent.tool.register）。在此之前，对话里的 Agent 调不到创建/写入工具。");
         copy.appendChild(hint);
         const errors = (status.errors || []).slice(0, 2);
         for (const item of errors) copy.appendChild(el("p", null, item));
@@ -811,16 +823,25 @@
       }
 
       let productionLoadSequence = 0;
-      async function ensureCurrent(force = false) {
+      async function ensureCurrent(force = false, throwOnError = false, isCurrent) {
         const sequence = ++productionLoadSequence;
         const requestedId = currentId;
-        if (!requestedId) { current = null; return; }
-        if (!force && current?.snapshot?.document?.id === requestedId) return;
+        if (!requestedId) {
+          if (throwOnError) throw Object.assign(new Error("当前作品已关闭"), { code: "CONFLICT" });
+          current = null; return;
+        }
+        if (!force && current?.snapshot?.document?.id === requestedId) return current;
         try {
           const result = await bridge.invoke("bone.get", { id: requestedId });
-          if (sequence !== productionLoadSequence || requestedId !== currentId) return;
+          if (sequence !== productionLoadSequence || requestedId !== currentId || (isCurrent && !isCurrent())) {
+            if (throwOnError) throw Object.assign(new Error("读取期间已切换作品或发生新的读取，请重新核对"), { code: "CONFLICT" });
+            return;
+          }
+          if (throwOnError && result?.snapshot?.document?.id !== requestedId) throw Object.assign(new Error("回读作品与请求不符"), { code: "CONFLICT" });
           current = { snapshot: result.snapshot, workflow: result.workflow };
+          return current;
         } catch (error) {
+          if (throwOnError) throw error;
           if (sequence !== productionLoadSequence || requestedId !== currentId) return;
           current = null;
           setStatus(`作品 ${requestedId} 读取失败：${String(error && error.message || error)}`);
@@ -828,6 +849,8 @@
       }
 
       async function selectProduction(id) {
+        window.BoneGenerationPanel.beginRender();
+        window.BoneStoryboard.beginRender();
         window.BoneMediaPreview.beginRender();
         window.BoneAssetDetails.beginRender();
         window.BoneSequencePreview.beginRender();
@@ -841,6 +864,8 @@
       // ---------- rendering ----------
 
       function render() {
+        window.BoneGenerationPanel.beginRender();
+        window.BoneStoryboard.beginRender();
         window.BoneMediaPreview.beginRender();
         window.BoneAssetDetails.beginRender();
         window.BoneSequencePreview.beginRender();
@@ -1457,7 +1482,7 @@
           const mapBtn = el("button", "vp-button", "让 Agent 补映射");
           mapBtn.addEventListener("click", () => {
             const lines = [
-              `请把 Bone 影视工厂作品 ${doc.id}《${doc.title}》第「${ep.title || ep.id}」集里这 ${unmapped.length} 个镜头映射到对应的叙事节拍：`,
+              `请把影视工厂作品 ${doc.id}《${doc.title}》第「${ep.title || ep.id}」集里这 ${unmapped.length} 个镜头映射到对应的叙事节拍：`,
               ...unmapped.map((shot) => `• ${shot.title || shot.id}（${shot.duration || 0}s）${shot.scene ? "：" + String(shot.scene).slice(0, 40) : ""}`),
               "当前节拍：" + (beats.map((beat, i) => `${i + 1}. ${beat.title}`).join("；") || "（无）"),
               "请用 update_shot 带 beatId 逐个挂到最合适的节拍；若都不合适，先用 write_episodes 补一个节拍（注意 beats 是整体替换，要把其余节拍一并带上）。",
@@ -1492,8 +1517,58 @@
         const context = window.BoneStoryboard.selection(prod.snapshot.document, scriptEpisodeId, selectedShotId);
         scriptEpisodeId = context.group?.id ?? null;
         selectedShotId = context.shot?.id ?? null;
-        const page = window.BoneStoryboard.render(prod.snapshot, context, {
+        const productionId = prod.snapshot.document.id;
+        const isCurrent = () => currentId === productionId && tab === "shots" && page.isConnected;
+        const assertGenerationCurrent = () => {
+          if (!isCurrent()) throw Object.assign(new Error("作品或页面已切换，请重新打开镜头"), { code: "CONFLICT" });
+        };
+        const invokeGeneration = async (channel, payload) => {
+          assertGenerationCurrent();
+          const result = await bridge.invoke(channel, payload);
+          assertGenerationCurrent();
+          return result;
+        };
+        const mutateShot = async (channel, args) => {
+          const result = await invokeGeneration(channel, { ...args, id: productionId });
+          window.BoneGenerationInputs.checked(result);
+          await ensureCurrent(true, true, isCurrent);
+          assertGenerationCurrent();
+          render();
+          return result;
+        };
+        const actions = {
           editorial: prod.workflow?.editorial,
+          isGenerationCurrent: isCurrent,
+          onUpdateShot: args => mutateShot("bone.shot.update", args),
+          onAddShots: args => mutateShot("bone.shot.add", args),
+          onMoveShot: args => mutateShot("bone.shot.move", args),
+          onDeleteShot: args => mutateShot("bone.shot.delete", args),
+          onReadGenerationImage: args => invokeGeneration("bone.generation.read-image", { ...args, id: productionId }),
+          onExportEpisode: async ({ episodeId, shots }) => {
+            const inputs = [];
+            for (const shot of shots) {
+              assertGenerationCurrent();
+              try { inputs.push(await window.BoneGenerationInputs.savedPackage({ shot, snapshot: prod.snapshot, actions, live: isCurrent })); }
+              catch (error) { throw Object.assign(new Error(`${shot.title || shot.id}：${error.message}`), { code: error.code }); }
+            }
+            const fresh = await ensureCurrent(true, true, isCurrent);
+            assertGenerationCurrent();
+            if (fresh.snapshot.document.revision !== prod.snapshot.document.revision) throw Object.assign(new Error("导出期间作品发生变化，请刷新后重试"), { code: "CONFLICT" });
+            window.BoneGenerationInputs.download({ schemaVersion: 1, productionId, episodeId, productionRevision: prod.snapshot.document.revision, inputs }, `${productionId}-${episodeId}-inputs.json`);
+          },
+          onSaveGenerationBrief: args => invokeGeneration("bone.generation.save", { ...args, id: productionId }),
+          onPrepareGeneration: args => invokeGeneration("bone.generation.prepare", { ...args, id: productionId }),
+          onRefreshGeneration: async ({ isCurrent } = {}) => {
+            assertGenerationCurrent();
+            const result = await ensureCurrent(true, true, isCurrent);
+            assertGenerationCurrent();
+            return result;
+          },
+          onGenerationClose: () => {
+            if (currentId !== productionId || tab !== "shots") return;
+            render();
+            document.querySelector(`[data-generation-shot-id="${selectedShotId}"]`)?.focus();
+          },
           loadMedia: args => bridge.invoke("bone.media", args),
           preview: (media, options = {}) => window.BoneMediaPreview.create({
             productionId: prod.snapshot.document.id, mediaId: media.id, kind: media.kind,
@@ -1504,7 +1579,7 @@
             scriptBeatIndex = 0;
             selectedShotId = null;
             render();
-            document.querySelector(".bw-episode-picker summary")?.focus();
+            document.querySelector(".bw-episode-picker")?.focus();
           },
           onShot: (id) => {
             selectedShotId = id;
@@ -1528,7 +1603,8 @@
             document.querySelector(".asset-search input")?.focus();
             document.querySelector(".asset-grid")?.scrollIntoView({ block: "nearest" });
           },
-        });
+        };
+        const page = window.BoneStoryboard.render(prod.snapshot, context, actions);
         bodyEl.replaceChildren(page);
       }
 
@@ -1565,7 +1641,7 @@
           for (const warning of flow.timingWarnings || []) card.appendChild(el("p", "bw-editorial-warning", warning.message));
           const next = el("button", "vp-button", "复制下一步给 Agent");
           next.addEventListener("click", () => copyText(
-            `继续 Bone 影视工厂作品 ${snapshot.document.id}《${snapshot.document.title}》。先读取 get_production 和 get_workflow_status，处理最早的相关缺口。${flow.next?.message || "核查已完成结果。"} 真实素材必须 register_media 后 adopt_media；保留其他已定稿内容。`,
+            `继续影视工厂作品 ${snapshot.document.id}《${snapshot.document.title}》。先读取 get_production 和 get_workflow_status，处理最早的相关缺口。${flow.next?.message || "核查已完成结果。"} 真实素材必须 register_media 后 adopt_media；保留其他已定稿内容。`,
             "已复制下一步指令",
           ));
           card.appendChild(next);

@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
   "id": "bone.video.workshop",
-  "name": "Bone 影视工厂",
-  "version": "0.21.0",
+  "name": "影视工厂",
+  "version": "0.25.0",
   "description": "Create and browse visual productions (works, scripts, shots) with the Agent inside PI-Desktop.",
   "main": "main.js",
   "contributes": {
@@ -14,7 +14,7 @@
         "id": "workshop",
         "title": {
           "en": "Bone Film Factory",
-          "zh-CN": "Bone 影视工厂"
+          "zh-CN": "影视工厂"
         },
         "icon": "image",
         "entry": "views/workshop.html",
@@ -24,7 +24,7 @@
     "commands": [
       {
         "id": "bone.video.workshop.open",
-        "title": "Bone 影视工厂: 打开工作台",
+        "title": "影视工厂: 打开工作台",
         "keywords": [
           "bone",
           "video",
@@ -122,6 +122,126 @@
           "required": [
             "id",
             "mediaId"
+          ],
+          "additionalProperties": false
+        }
+      },
+      {
+        "name": "prepare_shot_generation",
+        "description": "Compile a saved generationBrief and verify its registered image bytes against current revisions. Returns compiled prompt/ordered slots and a requestHash for read_generation_image. Read-only handoff; never submits to a provider.",
+        "risk": "low",
+        "schema": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "pattern": "^[a-z0-9][a-z0-9-]{0,63}$",
+              "maxLength": 64
+            },
+            "shotId": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$",
+              "maxLength": 128
+            },
+            "expectedShotRevision": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
+            },
+            "operation": {
+              "type": "string",
+              "enum": [
+                "image.generate",
+                "image.reference",
+                "video.text",
+                "video.reference",
+                "video.image",
+                "video.first-last"
+              ]
+            },
+            "maxReferenceImages": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 8
+            }
+          },
+          "required": [
+            "id",
+            "shotId",
+            "expectedShotRevision",
+            "operation"
+          ],
+          "additionalProperties": false
+        }
+      },
+      {
+        "name": "read_generation_image",
+        "description": "Read at most 64 KiB of one prepared reference image as base64. Rechecks requestHash and shot revision against fresh storage. Assemble decoded chunks, verify SHA-256, then use an authorized external generator; no private paths or provider submission.",
+        "risk": "low",
+        "schema": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "pattern": "^[a-z0-9][a-z0-9-]{0,63}$",
+              "maxLength": 64
+            },
+            "shotId": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$",
+              "maxLength": 128
+            },
+            "expectedShotRevision": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
+            },
+            "operation": {
+              "type": "string",
+              "enum": [
+                "image.generate",
+                "image.reference",
+                "video.text",
+                "video.reference",
+                "video.image",
+                "video.first-last"
+              ]
+            },
+            "maxReferenceImages": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 8
+            },
+            "requestHash": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$",
+              "maxLength": 64
+            },
+            "slot": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 8
+            },
+            "offset": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 33554432
+            },
+            "length": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 65536
+            }
+          },
+          "required": [
+            "id",
+            "shotId",
+            "expectedShotRevision",
+            "operation",
+            "requestHash",
+            "slot",
+            "offset",
+            "length"
           ],
           "additionalProperties": false
         }
@@ -874,7 +994,7 @@
       },
       {
         "name": "get_workflow_status",
-        "description": "检查 Bone 影视工厂完整创作链：简介、分集正文、脚本节拍、分镜映射、视频/声音/衔接计划、首尾帧图片和最终输出。返回缺口、下一步工具和各镜头状态；开始/继续创作前与完成后都调用。",
+        "description": "检查影视工厂完整创作链：简介、分集正文、脚本节拍、分镜映射、视频/声音/衔接计划、首尾帧图片和最终输出。返回缺口、下一步工具和各镜头状态；开始/继续创作前与完成后都调用。",
         "risk": "low",
         "schema": {
           "type": "object",
@@ -891,7 +1011,7 @@
       },
       {
         "name": "list_productions",
-        "description": "列出 Bone 影视工厂中的全部影像作品（标题、类型、集数、镜头数、更新时间）。",
+        "description": "列出影视工厂中的全部影像作品（标题、类型、集数、镜头数、更新时间）。",
         "risk": "low",
         "schema": {
           "type": "object",
@@ -1258,6 +1378,11 @@
               "type": "string",
               "description": "可选：归属的剧集 id"
             },
+            "expectedProductionRevision": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
+            },
             "shots": {
               "type": "array",
               "minItems": 1,
@@ -1505,6 +1630,452 @@
                       "entryState",
                       "exitState",
                       "rationale"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "generationBrief": {
+                    "type": [
+                      "object",
+                      "null"
+                    ],
+                    "properties": {
+                      "schemaVersion": {
+                        "type": "integer",
+                        "const": 1
+                      },
+                      "nodes": {
+                        "type": "array",
+                        "maxItems": 256,
+                        "items": {
+                          "oneOf": [
+                            {
+                              "type": "object",
+                              "properties": {
+                                "type": {
+                                  "const": "text",
+                                  "type": "string"
+                                },
+                                "text": {
+                                  "type": "string",
+                                  "maxLength": 24000
+                                }
+                              },
+                              "required": [
+                                "type",
+                                "text"
+                              ],
+                              "additionalProperties": false
+                            },
+                            {
+                              "type": "object",
+                              "properties": {
+                                "type": {
+                                  "const": "reference",
+                                  "type": "string"
+                                },
+                                "assetId": {
+                                  "type": "string",
+                                  "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$",
+                                  "maxLength": 128
+                                },
+                                "mediaId": {
+                                  "type": "string",
+                                  "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$",
+                                  "maxLength": 128
+                                },
+                                "role": {
+                                  "type": "string",
+                                  "enum": [
+                                    "identity",
+                                    "scene",
+                                    "prop",
+                                    "style",
+                                    "first-frame",
+                                    "last-frame"
+                                  ]
+                                }
+                              },
+                              "required": [
+                                "type",
+                                "assetId",
+                                "mediaId",
+                                "role"
+                              ],
+                              "additionalProperties": false
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    "required": [
+                      "schemaVersion",
+                      "nodes"
+                    ],
+                    "additionalProperties": false,
+                    "description": "Authoritative generation wording with explicit asset/media/role nodes. Whole replacement; omission preserves, null clears. Scene edits must explicitly resubmit or clear an existing brief."
+                  },
+                  "scale": {
+                    "type": "string",
+                    "enum": [
+                      "",
+                      "大远景",
+                      "全景",
+                      "中景",
+                      "中近景",
+                      "近景",
+                      "半身景",
+                      "特写",
+                      "极特写"
+                    ]
+                  },
+                  "lighting": {
+                    "type": "string",
+                    "maxLength": 8000
+                  },
+                  "referenceFields": {
+                    "type": [
+                      "object",
+                      "null"
+                    ],
+                    "properties": {
+                      "lighting": {
+                        "type": "object",
+                        "properties": {
+                          "schemaVersion": {
+                            "type": "integer",
+                            "const": 1
+                          },
+                          "nodes": {
+                            "type": "array",
+                            "maxItems": 256,
+                            "items": {
+                              "oneOf": [
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "type": {
+                                      "const": "text",
+                                      "type": "string"
+                                    },
+                                    "text": {
+                                      "type": "string",
+                                      "maxLength": 24000
+                                    }
+                                  },
+                                  "required": [
+                                    "type",
+                                    "text"
+                                  ],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "type": {
+                                      "const": "reference",
+                                      "type": "string"
+                                    },
+                                    "assetId": {
+                                      "type": "string",
+                                      "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$",
+                                      "maxLength": 128
+                                    },
+                                    "mediaId": {
+                                      "type": "string",
+                                      "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$",
+                                      "maxLength": 128
+                                    },
+                                    "role": {
+                                      "type": "string",
+                                      "enum": [
+                                        "identity",
+                                        "scene",
+                                        "prop",
+                                        "style",
+                                        "first-frame",
+                                        "last-frame"
+                                      ]
+                                    }
+                                  },
+                                  "required": [
+                                    "type",
+                                    "assetId",
+                                    "mediaId",
+                                    "role"
+                                  ],
+                                  "additionalProperties": false
+                                }
+                              ]
+                            }
+                          }
+                        },
+                        "required": [
+                          "schemaVersion",
+                          "nodes"
+                        ],
+                        "additionalProperties": false
+                      },
+                      "motion": {
+                        "type": "object",
+                        "properties": {
+                          "schemaVersion": {
+                            "type": "integer",
+                            "const": 1
+                          },
+                          "nodes": {
+                            "type": "array",
+                            "maxItems": 256,
+                            "items": {
+                              "oneOf": [
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "type": {
+                                      "const": "text",
+                                      "type": "string"
+                                    },
+                                    "text": {
+                                      "type": "string",
+                                      "maxLength": 24000
+                                    }
+                                  },
+                                  "required": [
+                                    "type",
+                                    "text"
+                                  ],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "type": {
+                                      "const": "reference",
+                                      "type": "string"
+                                    },
+                                    "assetId": {
+                                      "type": "string",
+                                      "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$",
+                                      "maxLength": 128
+                                    },
+                                    "mediaId": {
+                                      "type": "string",
+                                      "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$",
+                                      "maxLength": 128
+                                    },
+                                    "role": {
+                                      "type": "string",
+                                      "enum": [
+                                        "identity",
+                                        "scene",
+                                        "prop",
+                                        "style",
+                                        "first-frame",
+                                        "last-frame"
+                                      ]
+                                    }
+                                  },
+                                  "required": [
+                                    "type",
+                                    "assetId",
+                                    "mediaId",
+                                    "role"
+                                  ],
+                                  "additionalProperties": false
+                                }
+                              ]
+                            }
+                          }
+                        },
+                        "required": [
+                          "schemaVersion",
+                          "nodes"
+                        ],
+                        "additionalProperties": false
+                      },
+                      "dialogue": {
+                        "type": "object",
+                        "properties": {
+                          "schemaVersion": {
+                            "type": "integer",
+                            "const": 1
+                          },
+                          "nodes": {
+                            "type": "array",
+                            "maxItems": 256,
+                            "items": {
+                              "oneOf": [
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "type": {
+                                      "const": "text",
+                                      "type": "string"
+                                    },
+                                    "text": {
+                                      "type": "string",
+                                      "maxLength": 24000
+                                    }
+                                  },
+                                  "required": [
+                                    "type",
+                                    "text"
+                                  ],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "type": {
+                                      "const": "reference",
+                                      "type": "string"
+                                    },
+                                    "assetId": {
+                                      "type": "string",
+                                      "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$",
+                                      "maxLength": 128
+                                    },
+                                    "mediaId": {
+                                      "type": "string",
+                                      "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$",
+                                      "maxLength": 128
+                                    },
+                                    "role": {
+                                      "type": "string",
+                                      "enum": [
+                                        "identity",
+                                        "scene",
+                                        "prop",
+                                        "style",
+                                        "first-frame",
+                                        "last-frame"
+                                      ]
+                                    }
+                                  },
+                                  "required": [
+                                    "type",
+                                    "assetId",
+                                    "mediaId",
+                                    "role"
+                                  ],
+                                  "additionalProperties": false
+                                }
+                              ]
+                            }
+                          }
+                        },
+                        "required": [
+                          "schemaVersion",
+                          "nodes"
+                        ],
+                        "additionalProperties": false
+                      },
+                      "effects": {
+                        "type": "object",
+                        "properties": {
+                          "schemaVersion": {
+                            "type": "integer",
+                            "const": 1
+                          },
+                          "nodes": {
+                            "type": "array",
+                            "maxItems": 256,
+                            "items": {
+                              "oneOf": [
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "type": {
+                                      "const": "text",
+                                      "type": "string"
+                                    },
+                                    "text": {
+                                      "type": "string",
+                                      "maxLength": 24000
+                                    }
+                                  },
+                                  "required": [
+                                    "type",
+                                    "text"
+                                  ],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "type": {
+                                      "const": "reference",
+                                      "type": "string"
+                                    },
+                                    "assetId": {
+                                      "type": "string",
+                                      "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$",
+                                      "maxLength": 128
+                                    },
+                                    "mediaId": {
+                                      "type": "string",
+                                      "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$",
+                                      "maxLength": 128
+                                    },
+                                    "role": {
+                                      "type": "string",
+                                      "enum": [
+                                        "identity",
+                                        "scene",
+                                        "prop",
+                                        "style",
+                                        "first-frame",
+                                        "last-frame"
+                                      ]
+                                    }
+                                  },
+                                  "required": [
+                                    "type",
+                                    "assetId",
+                                    "mediaId",
+                                    "role"
+                                  ],
+                                  "additionalProperties": false
+                                }
+                              ]
+                            }
+                          }
+                        },
+                        "required": [
+                          "schemaVersion",
+                          "nodes"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "required": [],
+                    "additionalProperties": false
+                  },
+                  "generationSettings": {
+                    "type": [
+                      "object",
+                      "null"
+                    ],
+                    "properties": {
+                      "operation": {
+                        "type": "string",
+                        "enum": [
+                          "image.generate",
+                          "image.reference",
+                          "video.text",
+                          "video.reference",
+                          "video.image",
+                          "video.first-last"
+                        ]
+                      },
+                      "maxReferenceImages": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 8
+                      }
+                    },
+                    "required": [
+                      "operation",
+                      "maxReferenceImages"
                     ],
                     "additionalProperties": false
                   }
@@ -1872,6 +2443,452 @@
                 "rationale"
               ],
               "additionalProperties": false
+            },
+            "generationBrief": {
+              "type": [
+                "object",
+                "null"
+              ],
+              "properties": {
+                "schemaVersion": {
+                  "type": "integer",
+                  "const": 1
+                },
+                "nodes": {
+                  "type": "array",
+                  "maxItems": 256,
+                  "items": {
+                    "oneOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "type": {
+                            "const": "text",
+                            "type": "string"
+                          },
+                          "text": {
+                            "type": "string",
+                            "maxLength": 24000
+                          }
+                        },
+                        "required": [
+                          "type",
+                          "text"
+                        ],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "type": {
+                            "const": "reference",
+                            "type": "string"
+                          },
+                          "assetId": {
+                            "type": "string",
+                            "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$",
+                            "maxLength": 128
+                          },
+                          "mediaId": {
+                            "type": "string",
+                            "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$",
+                            "maxLength": 128
+                          },
+                          "role": {
+                            "type": "string",
+                            "enum": [
+                              "identity",
+                              "scene",
+                              "prop",
+                              "style",
+                              "first-frame",
+                              "last-frame"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "type",
+                          "assetId",
+                          "mediaId",
+                          "role"
+                        ],
+                        "additionalProperties": false
+                      }
+                    ]
+                  }
+                }
+              },
+              "required": [
+                "schemaVersion",
+                "nodes"
+              ],
+              "additionalProperties": false,
+              "description": "Authoritative generation wording with explicit asset/media/role nodes. Whole replacement; omission preserves, null clears. Scene edits must explicitly resubmit or clear an existing brief."
+            },
+            "scale": {
+              "type": "string",
+              "enum": [
+                "",
+                "大远景",
+                "全景",
+                "中景",
+                "中近景",
+                "近景",
+                "半身景",
+                "特写",
+                "极特写"
+              ]
+            },
+            "lighting": {
+              "type": "string",
+              "maxLength": 8000
+            },
+            "referenceFields": {
+              "type": [
+                "object",
+                "null"
+              ],
+              "properties": {
+                "lighting": {
+                  "type": "object",
+                  "properties": {
+                    "schemaVersion": {
+                      "type": "integer",
+                      "const": 1
+                    },
+                    "nodes": {
+                      "type": "array",
+                      "maxItems": 256,
+                      "items": {
+                        "oneOf": [
+                          {
+                            "type": "object",
+                            "properties": {
+                              "type": {
+                                "const": "text",
+                                "type": "string"
+                              },
+                              "text": {
+                                "type": "string",
+                                "maxLength": 24000
+                              }
+                            },
+                            "required": [
+                              "type",
+                              "text"
+                            ],
+                            "additionalProperties": false
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "type": {
+                                "const": "reference",
+                                "type": "string"
+                              },
+                              "assetId": {
+                                "type": "string",
+                                "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$",
+                                "maxLength": 128
+                              },
+                              "mediaId": {
+                                "type": "string",
+                                "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$",
+                                "maxLength": 128
+                              },
+                              "role": {
+                                "type": "string",
+                                "enum": [
+                                  "identity",
+                                  "scene",
+                                  "prop",
+                                  "style",
+                                  "first-frame",
+                                  "last-frame"
+                                ]
+                              }
+                            },
+                            "required": [
+                              "type",
+                              "assetId",
+                              "mediaId",
+                              "role"
+                            ],
+                            "additionalProperties": false
+                          }
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "schemaVersion",
+                    "nodes"
+                  ],
+                  "additionalProperties": false
+                },
+                "motion": {
+                  "type": "object",
+                  "properties": {
+                    "schemaVersion": {
+                      "type": "integer",
+                      "const": 1
+                    },
+                    "nodes": {
+                      "type": "array",
+                      "maxItems": 256,
+                      "items": {
+                        "oneOf": [
+                          {
+                            "type": "object",
+                            "properties": {
+                              "type": {
+                                "const": "text",
+                                "type": "string"
+                              },
+                              "text": {
+                                "type": "string",
+                                "maxLength": 24000
+                              }
+                            },
+                            "required": [
+                              "type",
+                              "text"
+                            ],
+                            "additionalProperties": false
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "type": {
+                                "const": "reference",
+                                "type": "string"
+                              },
+                              "assetId": {
+                                "type": "string",
+                                "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$",
+                                "maxLength": 128
+                              },
+                              "mediaId": {
+                                "type": "string",
+                                "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$",
+                                "maxLength": 128
+                              },
+                              "role": {
+                                "type": "string",
+                                "enum": [
+                                  "identity",
+                                  "scene",
+                                  "prop",
+                                  "style",
+                                  "first-frame",
+                                  "last-frame"
+                                ]
+                              }
+                            },
+                            "required": [
+                              "type",
+                              "assetId",
+                              "mediaId",
+                              "role"
+                            ],
+                            "additionalProperties": false
+                          }
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "schemaVersion",
+                    "nodes"
+                  ],
+                  "additionalProperties": false
+                },
+                "dialogue": {
+                  "type": "object",
+                  "properties": {
+                    "schemaVersion": {
+                      "type": "integer",
+                      "const": 1
+                    },
+                    "nodes": {
+                      "type": "array",
+                      "maxItems": 256,
+                      "items": {
+                        "oneOf": [
+                          {
+                            "type": "object",
+                            "properties": {
+                              "type": {
+                                "const": "text",
+                                "type": "string"
+                              },
+                              "text": {
+                                "type": "string",
+                                "maxLength": 24000
+                              }
+                            },
+                            "required": [
+                              "type",
+                              "text"
+                            ],
+                            "additionalProperties": false
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "type": {
+                                "const": "reference",
+                                "type": "string"
+                              },
+                              "assetId": {
+                                "type": "string",
+                                "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$",
+                                "maxLength": 128
+                              },
+                              "mediaId": {
+                                "type": "string",
+                                "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$",
+                                "maxLength": 128
+                              },
+                              "role": {
+                                "type": "string",
+                                "enum": [
+                                  "identity",
+                                  "scene",
+                                  "prop",
+                                  "style",
+                                  "first-frame",
+                                  "last-frame"
+                                ]
+                              }
+                            },
+                            "required": [
+                              "type",
+                              "assetId",
+                              "mediaId",
+                              "role"
+                            ],
+                            "additionalProperties": false
+                          }
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "schemaVersion",
+                    "nodes"
+                  ],
+                  "additionalProperties": false
+                },
+                "effects": {
+                  "type": "object",
+                  "properties": {
+                    "schemaVersion": {
+                      "type": "integer",
+                      "const": 1
+                    },
+                    "nodes": {
+                      "type": "array",
+                      "maxItems": 256,
+                      "items": {
+                        "oneOf": [
+                          {
+                            "type": "object",
+                            "properties": {
+                              "type": {
+                                "const": "text",
+                                "type": "string"
+                              },
+                              "text": {
+                                "type": "string",
+                                "maxLength": 24000
+                              }
+                            },
+                            "required": [
+                              "type",
+                              "text"
+                            ],
+                            "additionalProperties": false
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "type": {
+                                "const": "reference",
+                                "type": "string"
+                              },
+                              "assetId": {
+                                "type": "string",
+                                "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$",
+                                "maxLength": 128
+                              },
+                              "mediaId": {
+                                "type": "string",
+                                "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$",
+                                "maxLength": 128
+                              },
+                              "role": {
+                                "type": "string",
+                                "enum": [
+                                  "identity",
+                                  "scene",
+                                  "prop",
+                                  "style",
+                                  "first-frame",
+                                  "last-frame"
+                                ]
+                              }
+                            },
+                            "required": [
+                              "type",
+                              "assetId",
+                              "mediaId",
+                              "role"
+                            ],
+                            "additionalProperties": false
+                          }
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "schemaVersion",
+                    "nodes"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "required": [],
+              "additionalProperties": false
+            },
+            "generationSettings": {
+              "type": [
+                "object",
+                "null"
+              ],
+              "properties": {
+                "operation": {
+                  "type": "string",
+                  "enum": [
+                    "image.generate",
+                    "image.reference",
+                    "video.text",
+                    "video.reference",
+                    "video.image",
+                    "video.first-last"
+                  ]
+                },
+                "maxReferenceImages": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 8
+                }
+              },
+              "required": [
+                "operation",
+                "maxReferenceImages"
+              ],
+              "additionalProperties": false
             }
           },
           "required": [
@@ -1895,6 +2912,16 @@
             "shotId": {
               "type": "string",
               "description": "镜头 id"
+            },
+            "expectedProductionRevision": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
+            },
+            "expectedShotRevision": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
             }
           },
           "required": [
@@ -1922,6 +2949,11 @@
             "toIndex": {
               "type": "number",
               "description": "目标位置，0-based"
+            },
+            "expectedProductionRevision": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
             }
           },
           "required": [
